@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.19)
 project(Parallel_Mean_Shift_CUDA CUDA)
 
 set(CMAKE_CUDA_STANDARD 14)
