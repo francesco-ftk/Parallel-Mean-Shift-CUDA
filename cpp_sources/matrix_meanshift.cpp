@@ -25,7 +25,7 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 	float epsilon = bandwidth * 0.05;
 
 	// matrix to save the final mean of each pixel
-	float* means = new float[nOfPoints * dimension];
+	float means[nOfPoints * dimension];
 
 	// compute the means
 	for (int i = 0; i < nOfPoints; ++i) {

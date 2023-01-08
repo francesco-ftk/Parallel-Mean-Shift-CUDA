@@ -6,7 +6,7 @@
 #include "cpp_sources/source.cpp"
 #include "cuda_sources/source.cu"
 
-#include "cpp_sources/ppm_io.h"
+#include "cpp_sources/ppm_io.cpp"
 #include "cpp_sources/matrix_meanshift.cpp"
 #include "cpp_sources/soa_meanshift.cpp"
 #include "cpp_sources/rgb_pixels.cpp"
