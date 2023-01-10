@@ -1,5 +1,8 @@
 #ifndef RGB_PIXELS_CPP
 #define RGB_PIXELS_CPP
+#include <iostream>
+
+using namespace std;
 
 // structure of arrays
 struct RgbPixels {
