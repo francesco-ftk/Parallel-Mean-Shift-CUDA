@@ -5,8 +5,8 @@
 #include "errors.cu"
 #include "distance.cu"
 
-#define BLOCKS 32
-#define THREADS 32
+//#define BLOCKS 32
+#define THREADS 512
 
 using namespace std;
 using namespace chrono;
@@ -86,10 +86,12 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
 }
 
 int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
+
+	int blocks = (int) ceil((float) nOfPoints / THREADS);
+
     float *dev_points = nullptr;
     // matrix to save the final mean of each pixel
     float *dev_means = nullptr;
-    int nOfClusters = 0; // fixme Serve in GPU? NO
 
     // Allocate GPU buffers for three arrays (two input, one output)
     CUDA_CHECK_RETURN(cudaMalloc((void **) &dev_points, nOfPoints * dimension * sizeof(float)));
@@ -100,7 +102,7 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
 
     auto start_time_cuda = high_resolution_clock::now();
     // Launch the kernel on the GPU
-    matrixMeanShiftCUDA_kernel<<<BLOCKS, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
+    matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
 
     // Wait for the kernel to finish
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
@@ -117,6 +119,8 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
 
     // TODO parte non imbarazzantemente parallela
 
+	auto start_time_sequential = high_resolution_clock::now();
+
     // label all points as "not clustered"
     for (int k = 0; k < nOfPoints; ++k) { clusters[k] = -1; }
 
@@ -124,37 +128,25 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     int clustersCount = 0;
 
     for (int i = 0; i < nOfPoints; ++i) {
-        float mean[5];
+		float* mean = new float[dimension];
         for (int k = 0; k < dimension; ++k) { mean[k] = means[i * dimension + k]; }
-
-        /*printf("    Mean: [ ");
-        for (int k = 0; k < dimension; ++k)
-        { printf("%f ", mean[k]); }
-        printf("]\n");*/
-
-        //printf("  Finding a cluster...\n");
 
         int j = 0;
         while (j < clustersCount && clusters[i] == -1)
         {
             // select the current mode
-            float mode[dimension];
+			float* mode = new float[dimension];
             for (int k = 0; k < dimension; ++k) { mode[k] = modes[j * dimension + k]; }
 
             // if the mean is close enough to the current mode
             if (l2Distance(mean, mode, dimension) < bandwidth)
             {
-                //printf("    Cluster %d similar\n", j);
-
-                /*printf("    Cluster: [ ");
-                for (int k = 0; k < dimension; ++k)
-                { printf("%f ", mode[k]); }
-                printf("]\n");*/
-
                 // assign the point i to the cluster j
                 clusters[i] = j;
             }
             ++j;
+
+			delete[] mode;
         }
         // if the point i was not assigned to a cluster
         if (clusters[i] == -1) {
@@ -167,9 +159,22 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
 
             clustersCount++;
         }
+
+		delete[] mean;
     }
 
-    //printf("Meanshift: end\n");
+	auto end_time_sequential = high_resolution_clock::now();
+
+	// timings
+	float totalTime_cuda = duration_cast<microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
+	float totalTime_sequential = duration_cast<microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
+	float totalTime = totalTime_cuda + totalTime_sequential;
+
+	printf("Cuda timings:");
+	printf("  cuda:   %fms\n", totalTime_cuda);
+	printf("  sequential: %fms\n", totalTime_sequential);
+	printf("  total: %fms\n", totalTime);
+
     return clustersCount;
 
 }

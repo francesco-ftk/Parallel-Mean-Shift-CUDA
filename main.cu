@@ -3,17 +3,16 @@
 #include <chrono>
 #include "cuda_runtime.h"
 
-#include "cpp_sources/source.cpp"
-#include "cuda_sources/source.cu"
-
 #include "cpp_sources/ppm_io.cpp"
-#include "cpp_sources/matrix_meanshift.cpp"
-#include "cpp_sources/soa_meanshift.cpp"
+//#include "cpp_sources/matrix_meanshift.cpp"
+//#include "cpp_sources/soa_meanshift.cpp"
 #include "cpp_sources/rgb_pixels.cpp"
 
+#include "cuda_sources/matrix_meanshift_cuda.cu"
+
 #define INPUT_PATH "../img/image_bigger.ppm"
-#define OUTPUT_PATH "../img/image_bigger_out.ppm"
-#define ITERATIONS 10
+#define OUTPUT_PATH "../img/image_bigger_out_cuda.ppm"
+#define ITERATIONS 1
 #define BANDWIDTH 0.4
 
 /* ----- TIMINGS ------------------------------
@@ -47,6 +46,7 @@ using namespace chrono;
 
 int main()
 {
+	printf("hi\n");
 	// open the ppm image
 	PPM ppm;
 	if (ppm.read(INPUT_PATH) != 0)
@@ -65,8 +65,8 @@ int main()
 	int rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;
 	int rgbxySpaceSize = RgbPixels::SPACE_DIMENSION;
 	int rgbMaxValue = RgbPixels::MAX_VALUE;
-	float pixels[nOfPixels * rgbxySpaceSize];
-	float modes[nOfPixels * rgbxySpaceSize];
+	float* pixels = new float[nOfPixels * rgbxySpaceSize];
+	float* modes = new float[nOfPixels * rgbxySpaceSize];
 
 	// initialize the pixel data
 	for (int i = 0; i < nOfPixels; ++i)
@@ -79,7 +79,7 @@ int main()
 	}
 
 	// create the index array
-	int clusters[nOfPixels];
+	int* clusters = new int[nOfPixels];
 
 	// create the result variables
 	int nOfClusters;
@@ -92,7 +92,7 @@ int main()
 
 		// time the function
 		auto start_time = high_resolution_clock::now();
-		nOfClusters = matrixMeanShift(pixels, nOfPixels, BANDWIDTH, rgbxySpaceSize, modes, clusters);
+		nOfClusters = matrixMeanShiftCUDA(pixels, nOfPixels, BANDWIDTH, rgbxySpaceSize, modes, clusters, width, height);
 		auto end_time = high_resolution_clock::now();
 
 		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
@@ -111,7 +111,7 @@ int main()
 	printf("\n");
 
 	// SOA MEANSHIFT START //
-
+/*
 	// create the structures of arrays
 	RgbPixels soaPixels;
 	RgbPixels soaModes;
@@ -163,8 +163,19 @@ int main()
 	// free the memory
 	soaPixels.destroy();
 	soaModes.destroy();
-
+*/
 	// SOA MEANSHIFT END //
+
+	// create the output image buffer
+	rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;
+	rgbMaxValue = RgbPixels::MAX_VALUE;
+	uint8_t* outputBuffer = new uint8_t[nOfPixels * rgbPixelSize];
+    for (int i = 0; i < nOfPixels; ++i)
+	{
+		outputBuffer[i * rgbPixelSize]	   = (uint8_t) (modes[clusters[i] * rgbxySpaceSize]     * rgbMaxValue); // R
+		outputBuffer[i * rgbPixelSize + 1] = (uint8_t) (modes[clusters[i] * rgbxySpaceSize + 1] * rgbMaxValue); // G
+		outputBuffer[i * rgbPixelSize + 2] = (uint8_t) (modes[clusters[i] * rgbxySpaceSize + 2] * rgbMaxValue); // B
+	}
 
 	ppm.load(outputBuffer, height, width, ppm.getMax(), ppm.getMagic());
 
@@ -174,6 +185,11 @@ int main()
 		cout << "ERROR: failed to write the image";
 		return -1;
 	}
+
+	delete[] pixels;
+	delete[] modes;
+	delete[] clusters;
+	delete[] outputBuffer;
 
 	return 0;
 }

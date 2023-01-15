@@ -25,14 +25,14 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 	float epsilon = bandwidth * 0.05;
 
 	// matrix to save the final mean of each pixel
-	float means[nOfPoints * dimension];
+	float* means = new float[nOfPoints * dimension];
 
 	// compute the means
 	for (int i = 0; i < nOfPoints; ++i) {
 		//printf("  Examining point %d\n", i);
 
 		// initialize the mean on the current point
-		float mean[dimension];
+		float* mean = new float[dimension];
 		for (int k = 0; k < dimension; ++k) { mean[k] = points[i * dimension + k]; }
 
 		// assignment to ensure the first computation
@@ -42,14 +42,14 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 			//printf("  iterating...\n");
 
 			// initialize the centroid to 0, it will accumulate points later
-			float centroid[dimension];
+			float* centroid = new float[dimension];
 			for (int k = 0; k < dimension; ++k) { centroid[k] = 0; }
 
 			// track the number of points inside the bandwidth window
 			int windowPoints = 0;
 
 			for (int j = 0; j < nOfPoints; ++j) {
-				float point[dimension];
+				float* point = new float[dimension];
 				for (int k = 0; k < dimension; ++k) { point[k] = points[j * dimension + k]; }
 
 				if (l2Distance(mean, point, dimension) <= bandwidth) {
@@ -60,6 +60,8 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 					}
 					++windowPoints;
 				}
+
+				delete[] point;
 			}
 
 			//printf("    %d points examined\n", windowPoints);
@@ -73,10 +75,14 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 
 			// update the mean
 			for (int k = 0; k < dimension; ++k) { mean[k] = centroid[k]; }
+
+			delete[] centroid;
 		}
 
 		// mean now contains the mode of the point
 		for (int k = 0; k < dimension; ++k) { means[i * dimension + k] = mean[k]; };
+
+		delete[] mean;
 	}
 
 	//printf("Meanshift: second phase start\n");
@@ -88,7 +94,7 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 	int clustersCount = 0;
 
 	for (int i = 0; i < nOfPoints; ++i) {
-		float mean[5];
+		float* mean = new float[dimension];
 		for (int k = 0; k < dimension; ++k) { mean[k] = means[i * dimension + k]; }
 
 		/*printf("    Mean: [ ");
@@ -102,7 +108,7 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 		while (j < clustersCount && clusters[i] == -1)
 		{
 			// select the current mode
-			float mode[dimension];
+			float* mode = new float[dimension];
 			for (int k = 0; k < dimension; ++k) { mode[k] = modes[j * dimension + k]; }
 
 			// if the mean is close enough to the current mode
@@ -119,6 +125,8 @@ int matrixMeanShift(float* points, size_t nOfPoints, float bandwidth, size_t dim
 				clusters[i] = j;
 			}
 			++j;
+
+			delete[] mode;
 		}
 		// if the point i was not assigned to a cluster
 		if (clusters[i] == -1) {

@@ -42,7 +42,7 @@ int soaMeanShift(RgbPixels &points, size_t nOfPoints, float bandwidth, RgbPixels
 		//printf("  Examining point %d\n", i);
 
 		// initialize the mean on the current point
-		float mean[dimension];
+		float* mean = new float[dimension];
 		points.write(i, mean);
 
 		// assignment to ensure the first computation
@@ -52,14 +52,14 @@ int soaMeanShift(RgbPixels &points, size_t nOfPoints, float bandwidth, RgbPixels
 			//printf("  iterating...\n");
 
 			// initialize the centroid to 0, it will accumulate points later
-			float centroid[dimension];
+			float* centroid = new float[dimension];
 			for (int k = 0; k < 5; ++k) { centroid[k] = 0; }
 
 			// track the number of points inside the bandwidth window
 			int windowPoints = 0;
 
 			for (int j = 0; j < nOfPoints; ++j) {
-				float point[dimension];
+				float* point = new float[dimension];
 				points.write(j, point);
 
 				if (l2Distance(mean, point, dimension) <= bandwidth) {
@@ -70,6 +70,8 @@ int soaMeanShift(RgbPixels &points, size_t nOfPoints, float bandwidth, RgbPixels
 					}
 					++windowPoints;
 				}
+
+				delete[] point;
 			}
 
 			//printf("    %d points examined\n", windowPoints);
