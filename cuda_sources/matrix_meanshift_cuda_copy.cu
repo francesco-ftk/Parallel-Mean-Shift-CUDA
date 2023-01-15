@@ -107,7 +107,7 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
 
 int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
 
-	int blocks = (int) ceil((float) nOfPoints / THREADS);
+    int blocks = (int) ceil((float) nOfPoints / THREADS);
 
     float *dev_points = nullptr;
     // matrix to save the final mean of each pixel
@@ -141,7 +141,7 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
 
     // TODO parte non imbarazzantemente parallela
 
-	auto start_time_sequential = high_resolution_clock::now();
+    auto start_time_sequential = high_resolution_clock::now();
 
     // label all points as "not clustered"
     for (int k = 0; k < nOfPoints; ++k) { clusters[k] = -1; }
@@ -150,14 +150,14 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     int clustersCount = 0;
 
     for (int i = 0; i < nOfPoints; ++i) {
-		float* mean = new float[dimension];
+        float* mean = new float[dimension];
         for (int k = 0; k < dimension; ++k) { mean[k] = means[i * dimension + k]; }
 
         int j = 0;
         while (j < clustersCount && clusters[i] == -1)
         {
             // select the current mode
-			float* mode = new float[dimension];
+            float* mode = new float[dimension];
             for (int k = 0; k < dimension; ++k) { mode[k] = modes[j * dimension + k]; }
 
             // if the mean is close enough to the current mode
@@ -168,7 +168,7 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
             }
             ++j;
 
-			delete[] mode;
+            delete[] mode;
         }
         // if the point i was not assigned to a cluster
         if (clusters[i] == -1) {
@@ -182,22 +182,23 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
             clustersCount++;
         }
 
-		delete[] mean;
+        delete[] mean;
     }
 
-	auto end_time_sequential = high_resolution_clock::now();
+    auto end_time_sequential = high_resolution_clock::now();
 
-	// timings
-	float totalTime_cuda = duration_cast<microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
-	float totalTime_sequential = duration_cast<microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
-	float totalTime = totalTime_cuda + totalTime_sequential;
+    // timings
+    float totalTime_cuda = duration_cast<microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
+    float totalTime_sequential = duration_cast<microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
+    float totalTime = totalTime_cuda + totalTime_sequential;
 
-	printf("Cuda timings:");
-	printf("  cuda:   %fms\n", totalTime_cuda);
-	printf("  sequential: %fms\n", totalTime_sequential);
-	printf("  total: %fms\n", totalTime);
+    printf("Cuda timings:");
+    printf("  cuda:   %fms\n", totalTime_cuda);
+    printf("  sequential: %fms\n", totalTime_sequential);
+    printf("  total: %fms\n", totalTime);
 
     return clustersCount;
 
 }
+
 

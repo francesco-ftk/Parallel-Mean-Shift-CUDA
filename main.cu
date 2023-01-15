@@ -46,7 +46,6 @@ using namespace chrono;
 
 int main()
 {
-	printf("hi\n");
 	// open the ppm image
 	PPM ppm;
 	if (ppm.read(INPUT_PATH) != 0)
