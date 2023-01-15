@@ -47,25 +47,26 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
     // compute the means
     unsigned int x = (blockIdx.x * blockDim.x + threadIdx.x) * dimension;
     if (x < nOfPoints * dimension) { // x <= nOfPoints*dimension-4
-        float *mean = new float[dimension];
+        float* mean = &means[x];
         // initialize the mean on the current point
         for (int k = 0; k < dimension; ++k) { mean[k] = points[x + k]; }
 
         // assignment to ensure the first computation
         float shift = epsilon;
 
+		float* centroid = new float[dimension];
+
         while (shift >= epsilon) {
 
             // initialize the centroid to 0, it will accumulate points later
-            float *centroid = new float[dimension];
             for (int k = 0; k < dimension; ++k) { centroid[k] = 0; }
 
             // track the number of points inside the bandwidth window
             int windowPoints = 0;
 
             for (int j = 0; j < nOfPoints; ++j) {
-                float *point = new float[dimension];
-                for (int k = 0; k < dimension; ++k) { point[k] = points[j * dimension + k]; }
+                float* point = &points[j * dimension];
+                //for (int k = 0; k < dimension; ++k) { point[k] = points[j * dimension + k]; }
 
                 if (l2Distance_cuda(mean, point, dimension) <= bandwidth) {
                     // accumulate the point position
@@ -75,8 +76,6 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
                     }
                     ++windowPoints;
                 }
-
-                delete[] point;
             }
 
             // get the centroid dividing by the number of points taken into account
@@ -87,8 +86,9 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
             // update the mean
             for (int k = 0; k < dimension; ++k) { mean[k] = centroid[k]; }
 
-            delete[] centroid;
         }
+
+		delete[] centroid;
 
         /*
         clock_block(1000);
@@ -98,10 +98,7 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
         */
 
         // mean now contains the mode of the point
-        for (int k = 0; k < dimension; ++k) { means[x + k] = mean[k]; };
-
-        delete[] mean;
-
+        //for (int k = 0; k < dimension; ++k) { means[x + k] = mean[k]; };
     }
 }
 
