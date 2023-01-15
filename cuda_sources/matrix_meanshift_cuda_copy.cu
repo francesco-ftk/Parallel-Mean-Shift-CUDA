@@ -120,8 +120,8 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     auto start_time_cuda = high_resolution_clock::now();
     // Launch the kernel on the GPU
     printf("call kernel...\n");
-    //matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
-    matrixMeanShiftCUDA_kernel<<<2, 10>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
+    matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
+    //matrixMeanShiftCUDA_kernel<<<10, 64>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
 
     // Wait for the kernel to finish
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());

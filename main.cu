@@ -8,7 +8,7 @@
 //#include "cpp_sources/soa_meanshift.cpp"
 #include "cpp_sources/rgb_pixels.cpp"
 
-#include "cuda_sources/matrix_meanshift_cuda.cu"
+#include "cuda_sources/matrix_meanshift_cuda_copy.cu"
 
 #define INPUT_PATH "../img/image_bigger.ppm"
 #define OUTPUT_PATH "../img/image_bigger_out_cuda.ppm"
@@ -27,6 +27,7 @@
  * 100x100 image, Linux, 8 cores, 12 threads
  * 	 Matrix sequential:	2461ms
  * 	 Matrix OpenMP:		998ms
+ * 	 Matrix Cuda:       14000ms
  * 	   Speedup:			2.5
  *   SoA sequential:	2711ms
  * 	 SoA OpenMP:		726ms
