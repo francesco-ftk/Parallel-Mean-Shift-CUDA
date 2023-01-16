@@ -117,9 +117,9 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     // Copy input arrays from host to device memory (global)
     CUDA_CHECK_RETURN(cudaMemcpy(dev_points, points, nOfPoints * dimension * sizeof(float), cudaMemcpyHostToDevice));
 
+    printf("call kernel...\n");
     auto start_time_cuda = high_resolution_clock::now();
     // Launch the kernel on the GPU
-    printf("call kernel...\n");
     matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
     //matrixMeanShiftCUDA_kernel<<<10, 64>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
 
@@ -127,6 +127,8 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 
     auto end_time_cuda = high_resolution_clock::now();
+
+    printf("out from kernel \n");
 
     // Copy the result array from device to host memory
     float* means = new float[nOfPoints * dimension];
