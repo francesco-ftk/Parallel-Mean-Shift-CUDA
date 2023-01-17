@@ -19,6 +19,7 @@
  * 100x100 image, Windows, 12 cores, 18 threads
  * 	 Matrix sequential: 3609ms
  * 	 Matrix OpenMP:		1029ms
+ * 	 Matrix Cuda:		10886ms
  * 	   Speedup: 		3.5
  *   SoA sequential:	3834ms
  * 	 SoA OpenMP:		1060ms

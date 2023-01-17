@@ -25,6 +25,9 @@ using namespace chrono;
  * @return the array of cluster indices
  */
 
+__constant__ float devc_bandwidth;
+__constant__ size_t devc_dimension;
+
 __device__ void clock_block(clock_t clock_count)
 {
     clock_t start_clock = clock();
@@ -37,40 +40,40 @@ __device__ void clock_block(clock_t clock_count)
 
 
 // TODO portare in modalità ottimizzata a blocchi con shared
-__global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, float bandwidth, size_t dimension, float *means, int width, int height) {
+__global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, float *means, int width, int height) {
 
     //printf("inside\n");
 
     // stop value to check for the shift convergence
-    float epsilon = bandwidth * 0.05;
+    float epsilon = devc_bandwidth * 0.05;
 
     // compute the means
-    unsigned int x = (blockIdx.x * blockDim.x + threadIdx.x) * dimension;
-    if (x < nOfPoints * dimension) { // x <= nOfPoints*dimension-4
+    unsigned int x = (blockIdx.x * blockDim.x + threadIdx.x) * devc_dimension;
+    if (x < nOfPoints * devc_dimension) { // x <= nOfPoints*devc_dimension-4
         float* mean = &means[x];
         // initialize the mean on the current point
-        for (int k = 0; k < dimension; ++k) { mean[k] = points[x + k]; }
+        for (int k = 0; k < devc_dimension; ++k) { mean[k] = points[x + k]; }
 
         // assignment to ensure the first computation
         float shift = epsilon;
 
-		float* centroid = new float[dimension];
+		float* centroid = new float[devc_dimension];
 
         while (shift >= epsilon) {
 
             // initialize the centroid to 0, it will accumulate points later
-            for (int k = 0; k < dimension; ++k) { centroid[k] = 0; }
+            for (int k = 0; k < devc_dimension; ++k) { centroid[k] = 0; }
 
-            // track the number of points inside the bandwidth window
+            // track the number of points inside the devc_bandwidth window
             int windowPoints = 0;
 
             for (int j = 0; j < nOfPoints; ++j) {
-                float* point = &points[j * dimension];
-                //for (int k = 0; k < dimension; ++k) { point[k] = points[j * dimension + k]; }
+                float* point = &points[j * devc_dimension];
+                //for (int k = 0; k < devc_dimension; ++k) { point[k] = points[j * devc_dimension + k]; }
 
-                if (l2Distance_cuda(mean, point, dimension) <= bandwidth) {
+                if (l2Distance_cuda(mean, point, devc_dimension) <= devc_bandwidth) {
                     // accumulate the point position
-                    for (int k = 0; k < dimension; ++k) {
+                    for (int k = 0; k < devc_dimension; ++k) {
                         // todo: multiply by the chosen kernel
                         centroid[k] += point[k];
                     }
@@ -79,12 +82,12 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
             }
 
             // get the centroid dividing by the number of points taken into account
-            for (int k = 0; k < dimension; ++k) { centroid[k] /= windowPoints; }
+            for (int k = 0; k < devc_dimension; ++k) { centroid[k] /= windowPoints; }
 
-            shift = l2Distance_cuda(mean, centroid, dimension);
+            shift = l2Distance_cuda(mean, centroid, devc_dimension);
 
             // update the mean
-            for (int k = 0; k < dimension; ++k) { mean[k] = centroid[k]; }
+            for (int k = 0; k < devc_dimension; ++k) { mean[k] = centroid[k]; }
 
         }
 
@@ -98,13 +101,16 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, floa
         */
 
         // mean now contains the mode of the point
-        //for (int k = 0; k < dimension; ++k) { means[x + k] = mean[k]; };
+        //for (int k = 0; k < devc_dimension; ++k) { means[x + k] = mean[k]; };
     }
 }
 
 int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
 
     int blocks = (int) ceil((float) nOfPoints / THREADS);
+
+	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(devc_bandwidth, &bandwidth, sizeof(float)));
+	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(devc_dimension, &dimension, sizeof(size_t)));
 
     float *dev_points = nullptr;
     // matrix to save the final mean of each pixel
@@ -120,7 +126,7 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     printf("call kernel...\n");
     auto start_time_cuda = high_resolution_clock::now();
     // Launch the kernel on the GPU
-    matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
+    matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, dev_means, width, height);
     //matrixMeanShiftCUDA_kernel<<<10, 64>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
 
     // Wait for the kernel to finish
