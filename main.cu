@@ -93,7 +93,7 @@ int main()
 
 		// time the function
 		auto start_time = high_resolution_clock::now();
-		nOfClusters = matrixMeanShiftCUDA(pixels, nOfPixels, BANDWIDTH, rgbxySpaceSize, modes, clusters, width, height);
+		nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, rgbxySpaceSize, modes, clusters, width, height);
 		auto end_time = high_resolution_clock::now();
 
 		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
