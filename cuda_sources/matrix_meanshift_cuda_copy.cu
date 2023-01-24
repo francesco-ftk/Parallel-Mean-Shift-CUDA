@@ -55,7 +55,7 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, float *means, int widt
 
 	unsigned int phasesX = ceil((float) width / TILE_WIDTH);
 	unsigned int phasesY = ceil((float) height / TILE_WIDTH);
-	unsigned int phases = phasesX * phasesY;
+	//unsigned int phases = phasesX * phasesY;
 
     // stop value to check for the shift convergence
     float epsilon = devc_bandwidth * 0.05;
@@ -83,9 +83,18 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, float *means, int widt
 					// todo optimize (1 thread per channel)
 					if (ty < TILE_WIDTH && tx < TILE_WIDTH) {
 						for (int k = 0; k < devc_dimension; ++k) {
-							unsigned int tileRow = (phaseY * TILE_WIDTH + row);
-							unsigned int tileCol = (phaseX * TILE_WIDTH + col);
+							unsigned int tileRow = (phaseY * TILE_WIDTH + row % TILE_WIDTH); // r=16 c=16 ph=0,0 -> pos=0
+							unsigned int tileCol = (phaseX * TILE_WIDTH + col % TILE_WIDTH); // r=16 c=16 ph=1,0 -> pos=0
 							points_shared[ty][tx + k] = points[(tileRow * width + tileCol) * CHANNELS + k];
+
+							/*if (row == 10 && col == 10 && k == 0)
+							{
+								printf("phaseX = %d\n", phaseX);
+								printf("phaseY = %d\n", phaseY);
+								printf("  tileRow = %d\n", tileRow);
+								printf("  tileCol = %d\n", tileCol);
+								printf("  position = %d\n\n", (tileRow * width + tileCol) * CHANNELS + k);
+							}*/
 						}
 					}
 					__syncthreads();
@@ -93,8 +102,11 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, float *means, int widt
 					// initialize the centroid to 0, it will accumulate points later
 					for (int k = 0; k < devc_dimension; ++k) { centroid[k] = 0; }
 
-					for (int i = 0; i < TILE_WIDTH; ++i) {
-						for (int j = 0; j < TILE_WIDTH; ++j) {
+					int tileLimitX = min(TILE_WIDTH, width - TILE_WIDTH * phaseX);
+					int tileLimitY = min(TILE_WIDTH, height - TILE_WIDTH * phaseY);
+
+					for (int i = 0; i < tileLimitY; ++i) {
+						for (int j = 0; j < tileLimitX; ++j) {
 							//float point[CHANNELS];
 							float *point = &points_shared[i][j * CHANNELS];
 							//for (int k = 0; k < CHANNELS; ++k) { point[k] = points_shared[i * devc_dimension + k]; }
@@ -144,8 +156,8 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, float *means, int widt
 int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
 
 	int nOfPoints = width * height;
-	int gridSizeX = (int) ceil((float) width / THREADS_X);
-	int gridSizeY = (int) ceil((float) height / THREADS_Y);
+	int gridSizeX = (int) ceil((float) width / THREADS_X);  // 7
+	int gridSizeY = (int) ceil((float) height / THREADS_Y); // 7
 	dim3 gridSize(gridSizeX, gridSizeY, 1);
 	dim3 blockSize(THREADS_X, THREADS_Y, 1);
 
