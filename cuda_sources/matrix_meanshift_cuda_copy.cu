@@ -118,7 +118,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 			for (int k = 0; k < CHANNELS; ++k) { centroid[k] /= windowPoints; }
 
 			shift = l2Distance_cuda(mean, centroid, CHANNELS);
-			//shift = 0; // FIXME
+			shift = 0; // FIXME
 
 			// update the mean
 			for (int k = 0; k < CHANNELS; ++k) { mean[k] = centroid[k]; }
