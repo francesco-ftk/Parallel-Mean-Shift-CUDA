@@ -135,7 +135,7 @@ __global__ void matrixMeanShiftCUDA_kernel(float *points, float *means, int widt
 			for (int k = 0; k < devc_dimension; ++k) { mean[k] = centroid[k]; }
 
 			// ACCUMULA MALE IL VALORE DEI PUNTI
-			if(row==50 && col==60){
+			if(row==10 && col==10){
                 printf("windowpoints: %d\n", windowPoints);
                 for (int k = 0; k < devc_dimension; ++k) {
                         printf("centroid %d = %f\n", k, centroid[k]); // 7900
