@@ -12,3 +12,9 @@ add_executable(Parallel_Mean_Shift_CUDA main.cu)
 set_target_properties(
         Parallel_Mean_Shift_CUDA PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON)
+
+target_compile_options(Parallel_Mean_Shift_CUDA PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+        #--generate-line-info
+        --use_fast_math
+        #--relocatable-device-code=true
+        >)

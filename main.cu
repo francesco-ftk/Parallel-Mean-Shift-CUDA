@@ -8,22 +8,32 @@
 //#include "cpp_sources/soa_meanshift.cpp"
 #include "cpp_sources/rgb_pixels.cpp"
 
-#include "cuda_sources/matrix_meanshift_cuda_copy.cu"
+#include "cuda_sources/matrix_meanshift_cuda.cu"
 
 #define INPUT_PATH "../img/image_bigger.ppm"
 #define OUTPUT_PATH "../img/image_bigger_out_cuda.ppm"
-#define ITERATIONS 1
+#define ITERATIONS 10
 #define BANDWIDTH 0.4
 
 /* ----- TIMINGS ------------------------------
- * 100x100 image, Windows, 12 cores, 18 threads
- * 	 Matrix sequential: 3609ms
- * 	 Matrix OpenMP:		1029ms
- * 	 Matrix Cuda:		10886ms
- * 	   Speedup: 		3.5
- *   SoA sequential:	3834ms
- * 	 SoA OpenMP:		1060ms
- * 	   Speedup: 		3.6
+ * 100x100 image, Windows, 12 cores, 18 threads, block 16x16, tile 16x16
+ * 	 Matrix sequential: 3609ms	(release)
+ * 	 Matrix sequential: ???		(debug)
+ * 	 Matrix OpenMP:		1029ms	(release)
+ * 	 Matrix OpenMP:		???		(debug)
+ *   SoA sequential:	3834ms	(release)
+ *   SoA sequential:	???		(debug)
+ * 	 SoA OpenMP:		1060ms	(release)
+ * 	 SoA OpenMP:		???		(debug)
+ * 	 Matrix Cuda:		5219ms	(release)
+ * 	 Matrix Cuda:		???		(debug)
+ *
+ *	 Speedup OpenMP Matrix:		3.5 (release)
+ * 	 Speedup OpenMP Matrix:		3.5 (debug)
+ * 	 Speedup OpenMP SoA: 		3.6 (release)
+ * 	 Speedup OpenMP SoA: 		3.6 (debug)
+ * 	 Speedup Matrix Cuda: 		??? (release)
+ * 	 Speedup Matrix Cuda: 		??? (debug)
  *
  * 100x100 image, Linux, 8 cores, 12 threads
  * 	 Matrix sequential:	2461ms
@@ -59,8 +69,6 @@ int main()
 	int height = ppm.getH();
 	int nOfPixels = width * height;
 	uint8_t* inputBuffer = ppm.getImageHandler();
-
-	// MATRIX MEANSHIFT START //
 
 	// create the matrices
 	int rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;
@@ -107,65 +115,7 @@ int main()
 	printf("  average: %fms\n", averageTime);
 	printf("Number of clusters: %d\n", nOfClusters);
 
-	// MATRIX MEANSHIFT END //
-
 	printf("\n");
-
-	// SOA MEANSHIFT START //
-/*
-	// create the structures of arrays
-	RgbPixels soaPixels;
-	RgbPixels soaModes;
-	soaPixels.create(width, height);
-	soaModes.create(width, height);
-
-	// initialize the pixel data
-	soaPixels.load(inputBuffer);
-
-	// create the index array
-	//int clusters[nOfPixels];
-
-	// create the result variables
-	//int nOfClusters;
-	totalTime = 0;
-
-	// function loop
-	for (int i = 0; i < ITERATIONS; ++i)
-	{
-		printf("Calling the MeanShift function... (%d)\n", i);
-
-		// time the function
-		auto start_time = high_resolution_clock::now();
-		nOfClusters = soaMeanShift(soaPixels, nOfPixels, BANDWIDTH, soaModes, clusters);
-		auto end_time = high_resolution_clock::now();
-
-		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
-	}
-
-	averageTime = totalTime / ITERATIONS;
-
-	// print the results
-	printf("SoA timings: (measured on %d iterations)\n", ITERATIONS);
-	printf("  total:   %fms\n", totalTime);
-	printf("  average: %fms\n", averageTime);
-	printf("Number of clusters: %d\n", nOfClusters);
-
-	// create the output image buffer
-	rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;
-	rgbMaxValue = RgbPixels::MAX_VALUE;
-	uint8_t outputBuffer[nOfPixels * rgbPixelSize];
-	for(int i = 0; i < nOfPixels; ++i)
-	{
-		outputBuffer[i * rgbPixelSize]     = (uint8_t) (soaModes.r[clusters[i]] * rgbMaxValue); // R
-		outputBuffer[i * rgbPixelSize + 1] = (uint8_t) (soaModes.g[clusters[i]] * rgbMaxValue); // G
-		outputBuffer[i * rgbPixelSize + 2] = (uint8_t) (soaModes.b[clusters[i]] * rgbMaxValue); // B
-	}
-
-	// free the memory
-	soaPixels.destroy();
-	soaModes.destroy();
-*/
-	// SOA MEANSHIFT END //
 
 	// create the output image buffer
 	rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;

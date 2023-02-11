@@ -1,113 +1,164 @@
 #include <iostream>
 #include <chrono>
-#include "cuda_runtime.h"
 #include "../cpp_sources/distance.cpp"
 #include "errors.cu"
 #include "distance.cu"
 
-//#define BLOCKS 32
-#define THREADS 512
+#define CHANNELS 5
+#define EPSILON_MULTIPLIER 0.125f // this is different because bandwidth is squared
+#define THREADS_X 16
+#define THREADS_Y 16
+#define TILE_WIDTH 16
 
 using namespace std;
 using namespace chrono;
 
+// TODO kernel to weight the sums
+// TODO check with Excel sheet (shared memory)
+// TODO optimize to get coalesced access to memory
+// TODO update after HSV change
 /**
- * Cluster RGB RgbPixels with the mean shift algorithm
+ * CUDA kernel to cluster an RGB image with the mean shift algorithm
  *
- * The mean shift algorithm is used in a 5-dimensional space (r, g, b, x, y) to cluster the
- * RgbPixels of an image.
+ * The mean shift algorithm is used in a 5-dimensional space (r, g, b, x, y) to cluster the pixels of an image.
  *
- * @param points the structure of arrays containing the pixel values
- * @param modes the resulting modes to compute
- * @param bandwidth the radius of window size to compute the mean shift
+ * @param points the pixel values of the image
+ * @param means the output array of means to compute
+ * @param width the width of the image
+ * @param height the height of the image
  *
- * @todo
- * @return the array of cluster indices
+ * @param bandwidth
  */
 
-__device__ void clock_block(clock_t clock_count)
+__constant__ float const_squaredBandwidth;
+
+__global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, int width, int height)
 {
-    clock_t start_clock = clock();
-    clock_t clock_offset = 0;
-    while (clock_offset < clock_count)
-    {
-        clock_offset = clock() - start_clock;
-    }
-}
+	__shared__ float shared_tile[TILE_WIDTH][TILE_WIDTH * CHANNELS];
+	__shared__ bool shared_continueIteration;
 
+	unsigned bx = blockIdx.x; unsigned tx = threadIdx.x;
+	unsigned by = blockIdx.y; unsigned ty = threadIdx.y;
 
-// TODO portare in modalità ottimizzata a blocchi con shared
-__global__ void matrixMeanShiftCUDA_kernel(float *points, size_t nOfPoints, float bandwidth, size_t dimension, float *means, int width, int height) {
+	unsigned int row = by * blockDim.y + ty;
+	unsigned int col = bx * blockDim.x + tx;
+	unsigned int pos = (row * width + col) * CHANNELS;
 
-    //printf("inside\n");
+	unsigned int phasesX = ceil((float) width / TILE_WIDTH);
+	unsigned int phasesY = ceil((float) height / TILE_WIDTH);
 
     // stop value to check for the shift convergence
-    float epsilon = bandwidth * 0.05;
+    float epsilon = const_squaredBandwidth * EPSILON_MULTIPLIER;
 
-    // compute the means
-    unsigned int x = (blockIdx.x * blockDim.x + threadIdx.x) * dimension;
-    if (x < nOfPoints * dimension) { // x <= nOfPoints*dimension-4
-        float *mean = new float[dimension];
-        // initialize the mean on the current point
-        for (int k = 0; k < dimension; ++k) { mean[k] = points[x + k]; }
+	float* mean;
+	auto* centroid = new float[CHANNELS];
 
-        // assignment to ensure the first computation
-        float shift = epsilon;
+    // check if the thread pixel is not outside the image
+	if (row < height && col < width) {
+		mean = &means[pos];
 
-        while (shift >= epsilon) {
+		// initialize the mean on the current point
+		for (int k = 0; k < CHANNELS; ++k) { mean[k] = points[pos + k]; }
+	}
 
-            // initialize the centroid to 0, it will accumulate points later
-            float *centroid = new float[dimension];
-            for (int k = 0; k < dimension; ++k) { centroid[k] = 0; }
+	// set to ensure the first computation
+	atomicOr((int*) &shared_continueIteration, true);
 
-            // track the number of points inside the bandwidth window
-            int windowPoints = 0;
+	// shared_continueIteration is true if at least one thread per block must continue
+	while (shared_continueIteration)
+	{
+		// track the number of points inside the const_squaredBandwidth window
+		int windowPoints = 0;
 
-            for (int j = 0; j < nOfPoints; ++j) {
-                float *point = new float[dimension];
-                for (int k = 0; k < dimension; ++k) { point[k] = points[j * dimension + k]; }
+		// initialize the centroid to 0 to accumulate points later
+		for (int k = 0; k < CHANNELS; ++k) { centroid[k] = 0; }
 
-                if (l2Distance_cuda(mean, point, dimension) <= bandwidth) {
-                    // accumulate the point position
-                    for (int k = 0; k < dimension; ++k) {
-                        // todo: multiply by the chosen kernel
-                        centroid[k] += point[k];
-                    }
-                    ++windowPoints;
-                }
+		for (int phaseY = 0; phaseY < phasesY; ++phaseY)
+		{
+			for (int phaseX = 0; phaseX < phasesX; ++phaseX)
+			{
+				int tileDimX = min(TILE_WIDTH, width - TILE_WIDTH * phaseX);
+				int tileDimY = min(TILE_WIDTH, height - TILE_WIDTH * phaseY);
 
-                delete[] point;
-            }
+				// FIXME use 2-batch loading (14_gpu_cuda_6 slide 6)
+				// TODO optimize (1 thread per channel)
 
-            // get the centroid dividing by the number of points taken into account
-            for (int k = 0; k < dimension; ++k) { centroid[k] /= windowPoints; }
+				// load shared memory
+				if (ty < tileDimY && tx < tileDimX)
+				{
+					unsigned int phaseRow = phaseY * TILE_WIDTH + row % TILE_WIDTH;
+					unsigned int phaseCol = phaseX * TILE_WIDTH + col % TILE_WIDTH;
+					unsigned int phasePos = (phaseRow * width + phaseCol) * CHANNELS;
 
-            shift = l2Distance_cuda(mean, centroid, dimension);
+					for (int k = 0; k < CHANNELS; ++k) { shared_tile[ty][tx * CHANNELS + k] = points[phasePos + k]; }
+				}
 
-            // update the mean
-            for (int k = 0; k < dimension; ++k) { mean[k] = centroid[k]; }
+				__syncthreads();
 
-            delete[] centroid;
-        }
+				// compute the mean
+				if (row < height && col < width)
+				{
+					for (int tileRow = 0; tileRow < tileDimY; ++tileRow)
+					{
+						for (int tileCol = 0; tileCol < tileDimX; ++tileCol)
+						{
+							float *point = &shared_tile[tileRow][tileCol * CHANNELS];
 
-        /*
-        clock_block(1000);
-        printf("first_clock_finished %d block %d\n", threadIdx.x, blockIdx.x);
-        clock_block(1000);
-        printf("second_clock_finished %d block %d \n", threadIdx.x, blockIdx.x);
-        */
+							if (l2SquaredDistance_cuda(mean, point, CHANNELS) <= const_squaredBandwidth)
+							{
+								// accumulate the point position
+								for (int k = 0; k < CHANNELS; ++k)
+								{
+									centroid[k] += point[k];
+								}
+								++windowPoints;
+							}
+						}
+					}
+				}
 
-        // mean now contains the mode of the point
-        for (int k = 0; k < dimension; ++k) { means[x + k] = mean[k]; };
+				__syncthreads();
+			}
+		}
 
-        delete[] mean;
+		// reset
+		atomicAnd((int*) &shared_continueIteration, false);
 
-    }
+		__syncthreads();
+
+		// check if the thread pixel is not outside the image
+		if (row < height && col < width) {
+			// get the centroid dividing by the number of points taken into account
+			for (int k = 0; k < CHANNELS; ++k) { centroid[k] /= (float) windowPoints; }
+
+			float shift = l2SquaredDistance_cuda(mean, centroid, CHANNELS);
+
+			// update the mean
+			for (int k = 0; k < CHANNELS; ++k) { mean[k] = centroid[k]; }
+
+			// set if the thread must continue, hence the block
+			if (shift >= epsilon) {
+				atomicOr((int *) &shared_continueIteration, true);
+			}
+		}
+
+		__syncthreads();
+	}
+
+	delete[] centroid;
 }
 
-int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
+int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
 
-	int blocks = (int) ceil((float) nOfPoints / THREADS);
+	int nOfPoints = width * height;
+	int gridSizeX = (int) ceil((float) width / THREADS_X);  // 7
+	int gridSizeY = (int) ceil((float) height / THREADS_Y); // 7
+	dim3 gridSize(gridSizeX, gridSizeY, 1);
+	dim3 blockSize(THREADS_X, THREADS_Y, 1);
+
+	auto squaredBandwidth = (float) std::pow(bandwidth, 2);
+
+	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(const_squaredBandwidth, &squaredBandwidth, sizeof(float)));
 
     float *dev_points = nullptr;
     // matrix to save the final mean of each pixel
@@ -121,10 +172,9 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     CUDA_CHECK_RETURN(cudaMemcpy(dev_points, points, nOfPoints * dimension * sizeof(float), cudaMemcpyHostToDevice));
 
     auto start_time_cuda = high_resolution_clock::now();
+
     // Launch the kernel on the GPU
-    printf("call kernel...\n");
-    //matrixMeanShiftCUDA_kernel<<<blocks, THREADS>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
-    matrixMeanShiftCUDA_kernel<<<2, 10>>>(dev_points, nOfPoints, bandwidth, dimension, dev_means, width, height);
+    matrixMeanShiftCUDA_kernel<<<gridSize, blockSize>>>(dev_points, dev_means, width, height);
 
     // Wait for the kernel to finish
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
@@ -132,16 +182,16 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     auto end_time_cuda = high_resolution_clock::now();
 
     // Copy the result array from device to host memory
-    float* means = new float[nOfPoints * dimension];
+    auto* means = new float[nOfPoints * dimension];
     CUDA_CHECK_RETURN(cudaMemcpy(means, dev_means, nOfPoints * dimension * sizeof(float), cudaMemcpyDeviceToHost));
 
     // Free the GPU buffers
     CUDA_CHECK_RETURN(cudaFree(dev_points));
     CUDA_CHECK_RETURN(cudaFree(dev_means));
 
-    // TODO parte non imbarazzantemente parallela
+    // sequential phase
 
-	auto start_time_sequential = high_resolution_clock::now();
+    auto start_time_sequential = high_resolution_clock::now();
 
     // label all points as "not clustered"
     for (int k = 0; k < nOfPoints; ++k) { clusters[k] = -1; }
@@ -150,14 +200,14 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
     int clustersCount = 0;
 
     for (int i = 0; i < nOfPoints; ++i) {
-		float* mean = new float[dimension];
+        auto* mean = new float[dimension];
         for (int k = 0; k < dimension; ++k) { mean[k] = means[i * dimension + k]; }
 
         int j = 0;
         while (j < clustersCount && clusters[i] == -1)
         {
             // select the current mode
-			float* mode = new float[dimension];
+            auto* mode = new float[dimension];
             for (int k = 0; k < dimension; ++k) { mode[k] = modes[j * dimension + k]; }
 
             // if the mean is close enough to the current mode
@@ -168,11 +218,11 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
             }
             ++j;
 
-			delete[] mode;
+            delete[] mode;
         }
+
         // if the point i was not assigned to a cluster
         if (clusters[i] == -1) {
-            //printf("    No similar clusters, creating a new one... (%d)", clustersCount);
 
             // create a new cluster associated with the mode of the point i
             clusters[i] = clustersCount;
@@ -182,22 +232,22 @@ int matrixMeanShiftCUDA(float *points, size_t nOfPoints, float bandwidth, size_t
             clustersCount++;
         }
 
-		delete[] mean;
+        delete[] mean;
     }
 
-	auto end_time_sequential = high_resolution_clock::now();
+    auto end_time_sequential = high_resolution_clock::now();
 
-	// timings
-	float totalTime_cuda = duration_cast<microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
-	float totalTime_sequential = duration_cast<microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
-	float totalTime = totalTime_cuda + totalTime_sequential;
+    // timings
+    float totalTime_cuda = (float) duration_cast<microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
+    float totalTime_sequential = (float) duration_cast<microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
+    float totalTime = totalTime_cuda + totalTime_sequential;
 
-	printf("Cuda timings:");
-	printf("  cuda:   %fms\n", totalTime_cuda);
-	printf("  sequential: %fms\n", totalTime_sequential);
-	printf("  total: %fms\n", totalTime);
+    printf("Cuda timings:");
+    printf("  cuda:   %fms\n", totalTime_cuda);
+    printf("  sequential: %fms\n", totalTime_sequential);
+    printf("  total: %fms\n", totalTime);
 
     return clustersCount;
-
 }
+
 
