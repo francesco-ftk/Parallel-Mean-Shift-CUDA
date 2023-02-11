@@ -35,14 +35,25 @@
  * 	 Speedup Matrix Cuda: 		??? (release)
  * 	 Speedup Matrix Cuda: 		??? (debug)
  *
- * 100x100 image, Linux, 8 cores, 12 threads
- * 	 Matrix sequential:	2461ms
- * 	 Matrix OpenMP:		998ms
- * 	 Matrix Cuda:       14000ms
- * 	   Speedup:			2.5
- *   SoA sequential:	2711ms
- * 	 SoA OpenMP:		726ms
- * 	   Speedup:			3.7
+ * 100x100 image, Linux, 8 cores, 12 threads, block 16x16, tile 16x16
+ *
+ * 	 Matrix sequential: 2461ms	(release)
+ * 	 Matrix sequential: ???		(debug)
+ * 	 Matrix OpenMP:		998ms	(release)
+ * 	 Matrix OpenMP:		???		(debug)
+ *   SoA sequential:	2711ms	(release)
+ *   SoA sequential:	???		(debug)
+ * 	 SoA OpenMP:		726ms	(release)
+ * 	 SoA OpenMP:		???		(debug)
+ * 	 Matrix Cuda:		6945ms  (release)
+ * 	 Matrix Cuda:		???		(debug)
+ *
+ *	 Speedup OpenMP Matrix:		2.5 (release)
+ * 	 Speedup OpenMP Matrix:		??? (debug)
+ * 	 Speedup OpenMP SoA: 		3.7 (release)
+ * 	 Speedup OpenMP SoA: 		??? (debug)
+ * 	 Speedup Matrix Cuda: 		??? (release)
+ * 	 Speedup Matrix Cuda: 		??? (debug)
  *
  * Averaged on 10 iterations
  * --------------------------------------------
