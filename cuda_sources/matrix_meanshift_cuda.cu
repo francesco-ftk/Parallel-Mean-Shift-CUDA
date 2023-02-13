@@ -104,7 +104,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 						{
 							float *point = &shared_tile[tileRow][tileCol * CHANNELS];
 
-							if (l2SquaredDistance_cuda(mean, point, CHANNELS) <= const_squaredBandwidth)
+							if (l2_HSV_Distance_cuda(mean, point, CHANNELS) <= const_squaredBandwidth)
 							{
 								// accumulate the point position
 								for (int k = 0; k < CHANNELS; ++k)
@@ -131,7 +131,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 			// get the centroid dividing by the number of points taken into account
 			for (int k = 0; k < CHANNELS; ++k) { centroid[k] /= (float) windowPoints; }
 
-			float shift = l2SquaredDistance_cuda(mean, centroid, CHANNELS);
+			float shift = l2_HSV_Distance_cuda(mean, centroid, CHANNELS);
 
 			// update the mean
 			for (int k = 0; k < CHANNELS; ++k) { mean[k] = centroid[k]; }
@@ -211,7 +211,7 @@ int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float 
             for (int k = 0; k < dimension; ++k) { mode[k] = modes[j * dimension + k]; }
 
             // if the mean is close enough to the current mode
-            if (l2Distance(mean, mode, dimension) < bandwidth)
+            if (l2_HSV_Distance(mean, mode, dimension) < squaredBandwidth)
             {
                 // assign the point i to the cluster j
                 clusters[i] = j;

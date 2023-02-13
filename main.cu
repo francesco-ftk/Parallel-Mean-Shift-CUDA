@@ -12,8 +12,8 @@
 #include "cuda_sources/matrix_meanshift_cuda.cu"
 
 #define INPUT_PATH "../img/image_bigger.ppm"
-#define OUTPUT_PATH "../img/image_bigger_out_cuda.ppm"
-#define ITERATIONS 10
+#define OUTPUT_PATH "../img/image_bigger_out_cuda_hsv.ppm"
+#define ITERATIONS 1
 #define BANDWIDTH 0.4
 
 /* ----- TIMINGS ------------------------------
@@ -92,18 +92,25 @@ int main()
     float fH;
     float fS;
     float fV;
+    float fR;
+    float fG;
+    float fB;
 
 	// initialize the pixel data
 	for (int i = 0; i < nOfPixels; ++i)
 	{
-
-
-		pixels[i * rgbxySpaceSize]     = (float) inputBuffer[i * rgbPixelSize]     / rgbMaxValue; // R
-		pixels[i * rgbxySpaceSize + 1] = (float) inputBuffer[i * rgbPixelSize + 1] / rgbMaxValue; // G
-		pixels[i * rgbxySpaceSize + 2] = (float) inputBuffer[i * rgbPixelSize + 2] / rgbMaxValue; // B
-		pixels[i * rgbxySpaceSize + 3] = (float) ((i) % width) / (width - 1);					  // X
-		pixels[i * rgbxySpaceSize + 4] = (float) ((i) / width) / (height - 1);					  // Y
+        fR= (float) inputBuffer[i * rgbPixelSize]/rgbMaxValue;
+        fG= (float) inputBuffer[i * rgbPixelSize + 1]/rgbMaxValue;
+        fB= (float) inputBuffer[i * rgbPixelSize + 2]/rgbMaxValue;
+        RGBtoHSV(fR, fG, fB, fH, fS, fV);
+		pixels[i * rgbxySpaceSize]     = (float) fH/360;                        // H
+		pixels[i * rgbxySpaceSize + 1] = fS;                                    // S
+		pixels[i * rgbxySpaceSize + 2] = fV;                                    // V
+		pixels[i * rgbxySpaceSize + 3] = (float) ((i) % width) / (width - 1);	// X
+		pixels[i * rgbxySpaceSize + 4] = (float) ((i) / width) / (height - 1);	// Y
 	}
+
+    // printf("R: %f, G: %f, B: %f, H, %f, S: %f, V: %f \n", fR, fG, fB, fH, fS, fV);
 
 	// create the index array
 	int* clusters = new int[nOfPixels];
@@ -141,10 +148,16 @@ int main()
 	uint8_t* outputBuffer = new uint8_t[nOfPixels * rgbPixelSize];
     for (int i = 0; i < nOfPixels; ++i)
 	{
-		outputBuffer[i * rgbPixelSize]	   = (uint8_t) (modes[clusters[i] * rgbxySpaceSize]     * rgbMaxValue); // R
-		outputBuffer[i * rgbPixelSize + 1] = (uint8_t) (modes[clusters[i] * rgbxySpaceSize + 1] * rgbMaxValue); // G
-		outputBuffer[i * rgbPixelSize + 2] = (uint8_t) (modes[clusters[i] * rgbxySpaceSize + 2] * rgbMaxValue); // B
+        fH=modes[clusters[i] * rgbxySpaceSize] * 360;
+        fS=modes[clusters[i] * rgbxySpaceSize + 1];
+        fV=modes[clusters[i] * rgbxySpaceSize + 2];
+        HSVtoRGB(fR, fG, fB, fH, fS, fV);
+		outputBuffer[i * rgbPixelSize]	   = (uint8_t) (fR * rgbMaxValue); // R
+		outputBuffer[i * rgbPixelSize + 1] = (uint8_t) (fG * rgbMaxValue); // G
+		outputBuffer[i * rgbPixelSize + 2] = (uint8_t) (fB * rgbMaxValue); // B
 	}
+
+    // printf("R: %f, G: %f, B: %f, H, %f, S: %f, V: %f \n", fR, fG, fB, fH, fS, fV);
 
 	ppm.load(outputBuffer, height, width, ppm.getMax(), ppm.getMagic());
 
