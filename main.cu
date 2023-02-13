@@ -7,6 +7,7 @@
 //#include "cpp_sources/matrix_meanshift.cpp"
 //#include "cpp_sources/soa_meanshift.cpp"
 #include "cpp_sources/rgb_pixels.cpp"
+#include "cuda_sources/color_converter.cu"
 
 #include "cuda_sources/matrix_meanshift_cuda.cu"
 
@@ -88,9 +89,14 @@ int main()
 	float* pixels = new float[nOfPixels * rgbxySpaceSize];
 	float* modes = new float[nOfPixels * rgbxySpaceSize];
 
+    float fH;
+    float fS;
+    float fV;
+
 	// initialize the pixel data
 	for (int i = 0; i < nOfPixels; ++i)
 	{
+
 
 		pixels[i * rgbxySpaceSize]     = (float) inputBuffer[i * rgbPixelSize]     / rgbMaxValue; // R
 		pixels[i * rgbxySpaceSize + 1] = (float) inputBuffer[i * rgbPixelSize + 1] / rgbMaxValue; // G
