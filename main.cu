@@ -15,6 +15,10 @@
 #define OUTPUT_PATH "../img/image_bigger_out_cuda_hsv.ppm"
 #define ITERATIONS 1
 #define BANDWIDTH 0.4
+#define COLOR_SPACE_DIMENSION 3
+#define CLUSTERING_SPACE_DIMENSION 5
+#define RGB_MAX_VALUE 255
+#define HUE_MAX_VALUE 360
 
 /* ----- TIMINGS ------------------------------
  * 100x100 image, Windows, 12 cores, 18 threads, block 16x16, tile 16x16
@@ -83,34 +87,39 @@ int main()
 	uint8_t* inputBuffer = ppm.getImageHandler();
 
 	// create the matrices
-	int rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;
-	int rgbxySpaceSize = RgbPixels::SPACE_DIMENSION;
-	int rgbMaxValue = RgbPixels::MAX_VALUE;
-	float* pixels = new float[nOfPixels * rgbxySpaceSize];
-	float* modes = new float[nOfPixels * rgbxySpaceSize];
-
-    float fH;
-    float fS;
-    float fV;
-    float fR;
-    float fG;
-    float fB;
+	auto* pixels = new float[nOfPixels * CLUSTERING_SPACE_DIMENSION];
+	auto* modes  = new float[nOfPixels * CLUSTERING_SPACE_DIMENSION];
 
 	// initialize the pixel data
 	for (int i = 0; i < nOfPixels; ++i)
 	{
-        fR= (float) inputBuffer[i * rgbPixelSize]/rgbMaxValue;
-        fG= (float) inputBuffer[i * rgbPixelSize + 1]/rgbMaxValue;
-        fB= (float) inputBuffer[i * rgbPixelSize + 2]/rgbMaxValue;
-        RGBtoHSV(fR, fG, fB, fH, fS, fV);
-		pixels[i * rgbxySpaceSize]     = (float) fH/360;                        // H
-		pixels[i * rgbxySpaceSize + 1] = fS;                                    // S
-		pixels[i * rgbxySpaceSize + 2] = fV;                                    // V
-		pixels[i * rgbxySpaceSize + 3] = (float) ((i) % width) / (width - 1);	// X
-		pixels[i * rgbxySpaceSize + 4] = (float) ((i) / width) / (height - 1);	// Y
-	}
+		int R = inputBuffer[i * COLOR_SPACE_DIMENSION];
+		int G = inputBuffer[i * COLOR_SPACE_DIMENSION + 1];
+		int B = inputBuffer[i * COLOR_SPACE_DIMENSION + 2];
 
-    // printf("R: %f, G: %f, B: %f, H, %f, S: %f, V: %f \n", fR, fG, fB, fH, fS, fV);
+		float fR = (float) R / RGB_MAX_VALUE;
+		float fG = (float) G / RGB_MAX_VALUE;
+		float fB = (float) B / RGB_MAX_VALUE;
+
+		_div_t i_div_width = std::div(i, width);
+		float fX = (float) i_div_width.rem / (float) (width - 1);
+		float fY = (float) i_div_width.quot / (float) (height - 1);
+
+		pixels[i * CLUSTERING_SPACE_DIMENSION]     = fR;
+		pixels[i * CLUSTERING_SPACE_DIMENSION + 1] = fG;
+		pixels[i * CLUSTERING_SPACE_DIMENSION + 2] = fB;
+		pixels[i * CLUSTERING_SPACE_DIMENSION + 3] = fX;
+		pixels[i * CLUSTERING_SPACE_DIMENSION + 4] = fY;
+
+		/*if ((i + 500) % 1000 == 0) {
+			printf("------------------------------\n");
+			printf("R:\t%d\tG:\t%d\tB:\t%d\n", R, G, B);
+			printf("fR:\t%f\tfG:\t%f\tfB:\t%f\n", fR, fG, fB);
+			printf("fH:\t%f\tfS:\t%f\tfV:\t%f\n", fH, fS, fV);
+			printf("fX:\t%f\tfY:\t%f\n", fX, fY);
+			printf("------------------------------\n");
+		}*/
+	}
 
 	// create the index array
 	int* clusters = new int[nOfPixels];
@@ -126,7 +135,7 @@ int main()
 
 		// time the function
 		auto start_time = high_resolution_clock::now();
-		nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, rgbxySpaceSize, modes, clusters, width, height);
+		nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, CLUSTERING_SPACE_DIMENSION, modes, clusters, width, height);
 		auto end_time = high_resolution_clock::now();
 
 		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
@@ -142,19 +151,33 @@ int main()
 
 	printf("\n");
 
-	// create the output image buffer
-	rgbPixelSize = RgbPixels::COLOR_SPACE_DIMENSION;
-	rgbMaxValue = RgbPixels::MAX_VALUE;
-	uint8_t* outputBuffer = new uint8_t[nOfPixels * rgbPixelSize];
+	auto* outputBuffer = new uint8_t[nOfPixels * COLOR_SPACE_DIMENSION];
+
+	// populate the output image buffer
     for (int i = 0; i < nOfPixels; ++i)
 	{
-        fH=modes[clusters[i] * rgbxySpaceSize] * 360;
-        fS=modes[clusters[i] * rgbxySpaceSize + 1];
-        fV=modes[clusters[i] * rgbxySpaceSize + 2];
-        HSVtoRGB(fR, fG, fB, fH, fS, fV);
-		outputBuffer[i * rgbPixelSize]	   = (uint8_t) (fR * rgbMaxValue); // R
-		outputBuffer[i * rgbPixelSize + 1] = (uint8_t) (fG * rgbMaxValue); // G
-		outputBuffer[i * rgbPixelSize + 2] = (uint8_t) (fB * rgbMaxValue); // B
+        float fR = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION];
+		float fG = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 1];
+		float fB = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 2];
+		//float fX = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 3];
+		//float fY = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 4];
+
+		int R = (int) (fR * RGB_MAX_VALUE);
+		int G = (int) (fG * RGB_MAX_VALUE);
+		int B = (int) (fB * RGB_MAX_VALUE);
+
+		outputBuffer[i * COLOR_SPACE_DIMENSION]	    = R;
+		outputBuffer[i * COLOR_SPACE_DIMENSION + 1] = G;
+		outputBuffer[i * COLOR_SPACE_DIMENSION + 2] = B;
+
+		/*if ((i + 500) % 1000 == 0) {
+			printf("------------------------------\n");
+			printf("R:\t%d\tG:\t%d\tB:\t%d\n", R, G, B);
+			printf("fR:\t%f\tfG:\t%f\tfB:\t%f\n", fR, fG, fB);
+			printf("fH:\t%f\tfS:\t%f\tfV:\t%f\n", fH, fS, fV);
+			printf("fX:\t%f\tfY:\t%f\n", fX, fY);
+			printf("------------------------------\n");
+		}*/
 	}
 
     // printf("R: %f, G: %f, B: %f, H, %f, S: %f, V: %f \n", fR, fG, fB, fH, fS, fV);
