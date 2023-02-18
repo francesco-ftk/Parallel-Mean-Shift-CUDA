@@ -5,10 +5,10 @@
 #include "distance.cu"
 
 #define CHANNELS 5
-#define EPSILON_MULTIPLIER 0.125f // this is different because bandwidth is squared
+#define EPSILON_MULTIPLIER 0.1f // this is different because bandwidth is squared
 #define THREADS_X 16
 #define THREADS_Y 16
-#define TILE_WIDTH 16
+#define TILE_WIDTH 32
 
 using namespace std;
 using namespace chrono;
@@ -77,11 +77,14 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 		{
 			for (int phaseX = 0; phaseX < phasesX; ++phaseX)
 			{
+				// check tile dimension against image boarder
 				int tileDimX = min(TILE_WIDTH, width - TILE_WIDTH * phaseX);
 				int tileDimY = min(TILE_WIDTH, height - TILE_WIDTH * phaseY);
 
 				// FIXME use 2-batch loading (14_gpu_cuda_6 slide 6)
 				// TODO optimize (1 thread per channel)
+
+				int loadingSteps = ceil(pow(TILE_WIDTH, 2) / (THREADS_X * THREADS_Y));
 
 				// load shared memory
 				if (ty < tileDimY && tx < tileDimX)

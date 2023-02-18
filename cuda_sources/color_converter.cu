@@ -2,7 +2,83 @@
 #include <cstdlib>
 #include <cmath>
 
-using namespace std;
+#define RGB_MAX_VALUE 255
+#define HUE_MAX_VALUE 360
+
+// adapted from http://www.easyrgb.com/en/math.php
+void RGBtoXYZ(double R, double G, double B, double& X, double& Y, double& Z)
+{
+	// sR, sG and sB (Standard RGB) input range = 0 ÷ 255
+	// X, Y and Z output refer to a D65/2° standard illuminant.
+
+	R /= RGB_MAX_VALUE;
+	G /= RGB_MAX_VALUE;
+	B /= RGB_MAX_VALUE;
+
+	if (R > 0.04045)	{ R = pow((R + 0.055) / 1.055, 2.4); }
+	else				{ R /= 12.92; }
+
+	if (G > 0.04045)	{ G = pow((G + 0.055) / 1.055, 2.4); }
+	else				{ G /= 12.92; }
+
+	if (B > 0.04045)	{ B = pow((B + 0.055) / 1.055, 2.4); }
+	else				{ B /= 12.92; }
+
+	//R *= 100;
+	//G *= 100;
+	//B *= 100;
+
+	X = R * 0.4124 + G * 0.3576 + B * 0.1805;
+	Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+	Z = R * 0.0193 + G * 0.1192 + B * 0.9505;
+}
+
+// adapted from http://www.easyrgb.com/en/math.php
+void XYZtoRGB(double X, double Y, double Z, double& R, double& G, double& B)
+{
+	//X, Y and Z input refer to a D65/2° standard illuminant.
+	//sR, sG and sB (standard RGB) output range = 0 ÷ 255
+
+	//X /= 100;
+	//Y /= 100;
+	//Z /= 100;
+
+	R = X *  3.2406 + Y * -1.5372 + Z * -0.4986;
+	G = X * -0.9689 + Y *  1.8758 + Z *  0.0415;
+	B = X *  0.0557 + Y * -0.2040 + Z *  1.0570;
+
+	if (R > 0.0031308)	{ R = 1.055 * pow(R, ( 1 / 2.4 )) - 0.055; }
+	else				{ R *= 12.92; }
+
+	if (G > 0.0031308)	{ G = 1.055 * pow(G, ( 1 / 2.4 )) - 0.055; }
+	else				{ G *= 12.92; }
+
+	if (B > 0.0031308)	{ B = 1.055 * pow(B, ( 1 / 2.4 )) - 0.055; }
+	else				{ B *= 12.92; }
+
+	R *= RGB_MAX_VALUE;
+	G *= RGB_MAX_VALUE;
+	B *= RGB_MAX_VALUE;
+}
+
+/*void XYZtoCIELUV(double X, double Y, double Z, double& L, double& U, double& V) {
+	//Reference-X, Y and Z refer to specific illuminants and observers.
+	//Common reference values are available below in this same page.
+
+	var_U = (4 * X) / (X + (15 * Y) + (3 * Z));
+	var_V = (9 * Y) / (X + (15 * Y) + (3 * Z));
+
+	var_Y = Y / 100;
+	if (var_Y > 0.008856) var_Y = var_Y ^ (1 / 3);
+	else var_Y = (7.787 * var_Y) + (16 / 116);
+
+	ref_U = (4 * Reference - X) / (Reference - X + (15 * Reference - Y) + (3 * Reference - Z));
+	ref_V = (9 * Reference - Y) / (Reference - X + (15 * Reference - Y) + (3 * Reference - Z));
+
+	CIE - L * = (116 * var_Y) - 16;
+	CIE - u * = 13 * CIE - L * *(var_U - ref_U);
+	CIE - v * = 13 * CIE - L * *(var_V - ref_V);
+}*/
 
 /*! \brief Convert RGB to HSV color space
 
@@ -19,7 +95,6 @@ using namespace std;
   \param fV Hue component, used as output, range: [0, 1]
 
 */
-
 void RGBtoHSV(float fR, float fG, float fB, float& fH, float& fS, float& fV) {
     float fCMax = max(max(fR, fG), fB);
     float fCMin = min(min(fR, fG), fB);
@@ -107,4 +182,22 @@ void HSVtoRGB(float& fR, float& fG, float& fB, float fH, float fS, float fV) {
     fR += fM;
     fG += fM;
     fB += fM;
+}
+
+void _RGBtoHSV(int R, int G, int B, float& fH, float& fS, float& fV) {
+	float fR = (float) R / RGB_MAX_VALUE;
+	float fG = (float) G / RGB_MAX_VALUE;
+	float fB = (float) B / RGB_MAX_VALUE;
+
+	RGBtoHSV(fR, fG, fB, fH, fS, fV);
+	fH /= HUE_MAX_VALUE; // hue must be in [0, 1]
+}
+
+void _HSVtoRGB(int& R, int& G, int& B, float fH, float fS, float fV) {
+	float fR, fG, fB;
+	HSVtoRGB(fR, fG, fB, fH, fS, fV);
+
+	R = (int) (fR * RGB_MAX_VALUE);
+	G = (int) (fG * RGB_MAX_VALUE);
+	B = (int) (fB * RGB_MAX_VALUE);
 }

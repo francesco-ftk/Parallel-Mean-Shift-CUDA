@@ -12,7 +12,7 @@
 #include "cuda_sources/matrix_meanshift_cuda.cu"
 
 #define INPUT_PATH "../img/image_bigger.ppm"
-#define OUTPUT_PATH "../img/image_bigger_out_cuda_hsv.ppm"
+#define OUTPUT_PATH "../img/image_bigger_out_cuda_rgb.ppm"
 #define ITERATIONS 1
 #define BANDWIDTH 0.4
 #define COLOR_SPACE_DIMENSION 3
@@ -68,8 +68,6 @@
 // todo: cluster in the L*U*V* space
 // todo: kernel multiplication
 // todo: parallelize using Cuda
-
-using namespace std;
 using namespace chrono;
 
 int main()
@@ -90,12 +88,22 @@ int main()
 	auto* pixels = new float[nOfPixels * CLUSTERING_SPACE_DIMENSION];
 	auto* modes  = new float[nOfPixels * CLUSTERING_SPACE_DIMENSION];
 
+	double Xmax = 0;
+	double Ymax = 0;
+	double Zmax = 0;
+
 	// initialize the pixel data
 	for (int i = 0; i < nOfPixels; ++i)
 	{
 		int R = inputBuffer[i * COLOR_SPACE_DIMENSION];
 		int G = inputBuffer[i * COLOR_SPACE_DIMENSION + 1];
 		int B = inputBuffer[i * COLOR_SPACE_DIMENSION + 2];
+
+		/*double X,Y,Z;
+		RGBtoXYZ(R, G, B, X, Y, Z);
+		Xmax = std::max(X, Xmax);
+		Ymax = std::max(Y, Ymax);
+		Zmax = std::max(Z, Zmax);*/
 
 		float fR = (float) R / RGB_MAX_VALUE;
 		float fG = (float) G / RGB_MAX_VALUE;
@@ -114,12 +122,17 @@ int main()
 		/*if ((i + 500) % 1000 == 0) {
 			printf("------------------------------\n");
 			printf("R:\t%d\tG:\t%d\tB:\t%d\n", R, G, B);
-			printf("fR:\t%f\tfG:\t%f\tfB:\t%f\n", fR, fG, fB);
-			printf("fH:\t%f\tfS:\t%f\tfV:\t%f\n", fH, fS, fV);
+			printf("X:\t%f\tY:\t%f\tZ:\t%f\n", X, Y, Z);
+			//printf("fR:\t%f\tfG:\t%f\tfB:\t%f\n", fR, fG, fB);
+			//printf("fH:\t%f\tfS:\t%f\tfV:\t%f\n", fH, fS, fV);
 			printf("fX:\t%f\tfY:\t%f\n", fX, fY);
 			printf("------------------------------\n");
 		}*/
 	}
+
+	printf("Xmax:\t%f\n", Xmax);
+	printf("Ymax:\t%f\n", Ymax);
+	printf("Zmax:\t%f\n", Zmax);
 
 	// create the index array
 	int* clusters = new int[nOfPixels];
@@ -161,6 +174,9 @@ int main()
 		float fB = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 2];
 		//float fX = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 3];
 		//float fY = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 4];
+
+		/*double R, G, B;
+		XYZtoRGB(X, Y, Z, R, G, B);*/
 
 		int R = (int) (fR * RGB_MAX_VALUE);
 		int G = (int) (fG * RGB_MAX_VALUE);
