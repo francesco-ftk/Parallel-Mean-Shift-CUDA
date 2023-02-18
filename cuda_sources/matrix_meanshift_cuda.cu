@@ -4,14 +4,12 @@
 #include "errors.cu"
 #include "distance.cu"
 
+
 #define CHANNELS 5
 #define EPSILON_MULTIPLIER 0.1f // this is different because bandwidth is squared
 #define THREADS_X 16
 #define THREADS_Y 16
-#define TILE_WIDTH 32
-
-using namespace std;
-using namespace chrono;
+#define TILE_WIDTH 16
 
 // TODO kernel to weight the sums
 // TODO check with Excel sheet (shared memory)
@@ -84,17 +82,35 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 				// FIXME use 2-batch loading (14_gpu_cuda_6 slide 6)
 				// TODO optimize (1 thread per channel)
 
-				int loadingSteps = ceil(pow(TILE_WIDTH, 2) / (THREADS_X * THREADS_Y));
+                // NEW
+
+				int loadingStepsX = std::ceil((float) TILE_WIDTH / THREADS_X);
+				int loadingStepsY = std::ceil((float) TILE_WIDTH / THREADS_Y);
+
+                for (int i=0; i<loadingStepsX; i++){
+                    for(int j=0; j<loadingStepsY; j++){
+                        if (ty + THREADS_Y * j < tileDimY && tx + THREADS_X * i < tileDimX)
+                        {
+                            unsigned int phaseRow = phaseY * TILE_WIDTH + row % TILE_WIDTH + THREADS_Y * j;
+                            unsigned int phaseCol = phaseX * TILE_WIDTH + col % TILE_WIDTH + THREADS_X * i;
+                            unsigned int phasePos = (phaseRow * width + phaseCol) * CHANNELS;
+
+                            for (int k = 0; k < CHANNELS; ++k) { shared_tile[ty + THREADS_Y * j][(tx + THREADS_X * i) * CHANNELS + k] = points[phasePos + k]; }
+                        }
+                    }
+                }
+
+                // OLD
 
 				// load shared memory
-				if (ty < tileDimY && tx < tileDimX)
-				{
-					unsigned int phaseRow = phaseY * TILE_WIDTH + row % TILE_WIDTH;
-					unsigned int phaseCol = phaseX * TILE_WIDTH + col % TILE_WIDTH;
-					unsigned int phasePos = (phaseRow * width + phaseCol) * CHANNELS;
-
-					for (int k = 0; k < CHANNELS; ++k) { shared_tile[ty][tx * CHANNELS + k] = points[phasePos + k]; }
-				}
+//				if (ty < tileDimY && tx < tileDimX)
+//				{
+//					unsigned int phaseRow = phaseY * TILE_WIDTH + row % TILE_WIDTH;
+//					unsigned int phaseCol = phaseX * TILE_WIDTH + col % TILE_WIDTH;
+//					unsigned int phasePos = (phaseRow * width + phaseCol) * CHANNELS;
+//
+//					for (int k = 0; k < CHANNELS; ++k) { shared_tile[ty][tx * CHANNELS + k] = points[phasePos + k]; }
+//				}
 
 				__syncthreads();
 
@@ -174,7 +190,7 @@ int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float 
     // Copy input arrays from host to device memory (global)
     CUDA_CHECK_RETURN(cudaMemcpy(dev_points, points, nOfPoints * dimension * sizeof(float), cudaMemcpyHostToDevice));
 
-    auto start_time_cuda = high_resolution_clock::now();
+    auto start_time_cuda = std::chrono::high_resolution_clock::now();
 
     // Launch the kernel on the GPU
     matrixMeanShiftCUDA_kernel<<<gridSize, blockSize>>>(dev_points, dev_means, width, height);
@@ -182,7 +198,7 @@ int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float 
     // Wait for the kernel to finish
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 
-    auto end_time_cuda = high_resolution_clock::now();
+    auto end_time_cuda = std::chrono::high_resolution_clock::now();
 
     // Copy the result array from device to host memory
     auto* means = new float[nOfPoints * dimension];
@@ -194,7 +210,7 @@ int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float 
 
     // sequential phase
 
-    auto start_time_sequential = high_resolution_clock::now();
+    auto start_time_sequential = std::chrono::high_resolution_clock::now();
 
     // label all points as "not clustered"
     for (int k = 0; k < nOfPoints; ++k) { clusters[k] = -1; }
@@ -238,11 +254,11 @@ int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float 
         delete[] mean;
     }
 
-    auto end_time_sequential = high_resolution_clock::now();
+    auto end_time_sequential = std::chrono::high_resolution_clock::now();
 
     // timings
-    float totalTime_cuda = (float) duration_cast<microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
-    float totalTime_sequential = (float) duration_cast<microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
+    float totalTime_cuda = (float) std::chrono::duration_cast<std::chrono::microseconds>(end_time_cuda - start_time_cuda).count() / 1000.f;
+    float totalTime_sequential = (float) std::chrono::duration_cast<std::chrono::microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
     float totalTime = totalTime_cuda + totalTime_sequential;
 
     printf("Cuda timings:");

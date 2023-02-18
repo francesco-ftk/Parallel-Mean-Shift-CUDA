@@ -109,7 +109,7 @@ int main()
 		float fG = (float) G / RGB_MAX_VALUE;
 		float fB = (float) B / RGB_MAX_VALUE;
 
-		_div_t i_div_width = std::div(i, width);
+		div_t i_div_width = std::div(i, width);
 		float fX = (float) i_div_width.rem / (float) (width - 1);
 		float fY = (float) i_div_width.quot / (float) (height - 1);
 
