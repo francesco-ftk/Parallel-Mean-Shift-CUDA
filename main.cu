@@ -130,9 +130,11 @@ int main()
 		}*/
 	}
 
-	printf("Xmax:\t%f\n", Xmax);
+ /*
+    printf("Xmax:\t%f\n", Xmax);
 	printf("Ymax:\t%f\n", Ymax);
 	printf("Zmax:\t%f\n", Zmax);
+ */
 
 	// create the index array
 	int* clusters = new int[nOfPixels];
