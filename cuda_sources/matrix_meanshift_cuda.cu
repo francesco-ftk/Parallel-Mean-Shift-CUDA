@@ -9,7 +9,7 @@
 #define EPSILON_MULTIPLIER 0.1f // this is different because bandwidth is squared
 #define THREADS_X 16
 #define THREADS_Y 16
-#define TILE_WIDTH 32
+#define TILE_WIDTH 16
 
 // TODO kernel to weight the sums
 // TODO check with Excel sheet (shared memory)

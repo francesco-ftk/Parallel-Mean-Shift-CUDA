@@ -30,8 +30,8 @@
  *   SoA sequential:	???		(debug)
  * 	 SoA OpenMP:		1060ms	(release)
  * 	 SoA OpenMP:		???		(debug)
- * 	 Matrix Cuda:		5219ms	(release)
- * 	 Matrix Cuda:		???		(debug)
+ * 	 Matrix Cuda:		1973ms	(release)
+ * 	 Matrix Cuda:		2012ms	(debug)
  *
  *	 Speedup OpenMP Matrix:		3.5 (release)
  * 	 Speedup OpenMP Matrix:		3.5 (debug)
@@ -68,7 +68,6 @@
 // todo: cluster in the L*U*V* space
 // todo: kernel multiplication
 // todo: parallelize using Cuda
-using namespace chrono;
 
 int main()
 {
@@ -87,10 +86,6 @@ int main()
 	// create the matrices
 	auto* pixels = new float[nOfPixels * CLUSTERING_SPACE_DIMENSION];
 	auto* modes  = new float[nOfPixels * CLUSTERING_SPACE_DIMENSION];
-
-	double Xmax = 0;
-	double Ymax = 0;
-	double Zmax = 0;
 
 	// initialize the pixel data
 	for (int i = 0; i < nOfPixels; ++i)
@@ -149,11 +144,11 @@ int main()
 		printf("Calling the MeanShift function... (%d)\n", i);
 
 		// time the function
-		auto start_time = high_resolution_clock::now();
+		auto start_time = chrono::high_resolution_clock::now();
 		nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, CLUSTERING_SPACE_DIMENSION, modes, clusters, width, height);
-		auto end_time = high_resolution_clock::now();
+		auto end_time = chrono::high_resolution_clock::now();
 
-		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
+		totalTime += chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() / 1000.f;
 	}
 
 	float averageTime = totalTime / ITERATIONS;
