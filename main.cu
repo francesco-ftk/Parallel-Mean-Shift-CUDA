@@ -13,7 +13,7 @@
 
 #define INPUT_PATH "../img/image_bigger.ppm"
 #define OUTPUT_PATH "../img/image_bigger_out_cuda_rgb.ppm"
-#define ITERATIONS 1
+#define ITERATIONS 10
 #define BANDWIDTH 0.4
 #define COLOR_SPACE_DIMENSION 3
 #define CLUSTERING_SPACE_DIMENSION 5
@@ -43,22 +43,22 @@
  * 100x100 image, Linux, 8 cores, 12 threads, block 16x16, tile 16x16
  *
  * 	 Matrix sequential: 2461ms	(release)
- * 	 Matrix sequential: ???		(debug)
+ * 	 Matrix sequential: 40924ms	(debug)
  * 	 Matrix OpenMP:		998ms	(release)
- * 	 Matrix OpenMP:		???		(debug)
+ * 	 Matrix OpenMP:		12436ms		(debug)
  *   SoA sequential:	2711ms	(release)
- *   SoA sequential:	???		(debug)
+ *   SoA sequential:	40007ms		(debug)
  * 	 SoA OpenMP:		726ms	(release)
- * 	 SoA OpenMP:		???		(debug)
+ * 	 SoA OpenMP:		13838ms		(debug)
  * 	 Matrix Cuda:		6945ms  (release)
- * 	 Matrix Cuda:		???		(debug)
+ * 	 Matrix Cuda:		7602ms		(debug)
  *
  *	 Speedup OpenMP Matrix:		2.5 (release)
- * 	 Speedup OpenMP Matrix:		??? (debug)
+ * 	 Speedup OpenMP Matrix:		3.2 (debug)
  * 	 Speedup OpenMP SoA: 		3.7 (release)
- * 	 Speedup OpenMP SoA: 		??? (debug)
+ * 	 Speedup OpenMP SoA: 		2.9 (debug)
  * 	 Speedup Matrix Cuda: 		??? (release)
- * 	 Speedup Matrix Cuda: 		??? (debug)
+ * 	 Speedup Matrix Cuda: 		5.4 (debug)
  *
  * Averaged on 10 iterations
  * --------------------------------------------
