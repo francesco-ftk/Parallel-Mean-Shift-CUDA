@@ -51,7 +51,7 @@
  * 	 SoA OpenMP:		726ms	(release)
  * 	 SoA OpenMP:		13838ms		(debug)
  * 	 Matrix Cuda:		6945ms  (release)
- * 	 Matrix Cuda:		7602ms		(debug)
+ * 	 Matrix Cuda:		13000ms		(debug)
  *
  *	 Speedup OpenMP Matrix:		2.5 (release)
  * 	 Speedup OpenMP Matrix:		3.2 (debug)

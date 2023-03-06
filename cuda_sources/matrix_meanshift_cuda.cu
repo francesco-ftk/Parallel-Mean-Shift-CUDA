@@ -125,14 +125,12 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 					}
 				}
 
+                // reset shared_continueIteration
+                atomicAnd((int*) &shared_continueIteration, false);
+
 				__syncthreads();
 			}
 		}
-
-		// reset
-		atomicAnd((int*) &shared_continueIteration, false);
-
-		__syncthreads();
 
 		// check if the thread pixel is not outside the image
 		if (private_continueIteration && row < height && col < width) {
