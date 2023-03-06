@@ -11,8 +11,8 @@
 
 #include "cuda_sources/matrix_meanshift_cuda.cu"
 
-#define INPUT_PATH "../img/image_bigger.ppm"
-#define OUTPUT_PATH "../img/image_bigger_out_cuda_rgb.ppm"
+#define INPUT_PATH "../img/balloons_100.ppm"
+#define OUTPUT_PATH "../img/out.ppm"
 #define ITERATIONS 1
 #define BANDWIDTH 0.4
 #define COLOR_SPACE_DIMENSION 3
