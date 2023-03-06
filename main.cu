@@ -13,7 +13,7 @@
 
 #define INPUT_PATH "../img/image_bigger.ppm"
 #define OUTPUT_PATH "../img/image_bigger_out_cuda_rgb.ppm"
-#define ITERATIONS 10
+#define ITERATIONS 1
 #define BANDWIDTH 0.4
 #define COLOR_SPACE_DIMENSION 3
 #define CLUSTERING_SPACE_DIMENSION 5

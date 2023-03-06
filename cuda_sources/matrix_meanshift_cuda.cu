@@ -6,7 +6,7 @@
 
 
 #define CHANNELS 5
-#define EPSILON_MULTIPLIER 0.1f // this is different because bandwidth is squared
+#define EPSILON_MULTIPLIER 0.05f // this is different because bandwidth is squared
 #define THREADS_X 16
 #define THREADS_Y 16
 #define TILE_WIDTH 16
@@ -34,6 +34,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 {
 	__shared__ float shared_tile[TILE_WIDTH][TILE_WIDTH * CHANNELS];
 	__shared__ bool shared_continueIteration;
+	bool private_continueIteration = true;
 
 	unsigned bx = blockIdx.x; unsigned tx = threadIdx.x;
 	unsigned by = blockIdx.y; unsigned ty = threadIdx.y;
@@ -46,7 +47,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 	unsigned int phasesY = ceil((float) height / TILE_WIDTH);
 
     // stop value to check for the shift convergence
-    float epsilon = const_squaredBandwidth * EPSILON_MULTIPLIER;
+    float epsilon = (float) pow(sqrt(const_squaredBandwidth) * EPSILON_MULTIPLIER, 2);
 
 	float* mean;
 	auto* centroid = new float[CHANNELS];
@@ -100,22 +101,10 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
                     }
                 }
 
-                // OLD
-
-				// load shared memory
-//				if (ty < tileDimY && tx < tileDimX)
-//				{
-//					unsigned int phaseRow = phaseY * TILE_WIDTH + row % TILE_WIDTH;
-//					unsigned int phaseCol = phaseX * TILE_WIDTH + col % TILE_WIDTH;
-//					unsigned int phasePos = (phaseRow * width + phaseCol) * CHANNELS;
-//
-//					for (int k = 0; k < CHANNELS; ++k) { shared_tile[ty][tx * CHANNELS + k] = points[phasePos + k]; }
-//				}
-
 				__syncthreads();
 
 				// compute the mean
-				if (row < height && col < width)
+				if (private_continueIteration && row < height && col < width)
 				{
 					for (int tileRow = 0; tileRow < tileDimY; ++tileRow)
 					{
@@ -146,7 +135,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 		__syncthreads();
 
 		// check if the thread pixel is not outside the image
-		if (row < height && col < width) {
+		if (private_continueIteration && row < height && col < width) {
 			// get the centroid dividing by the number of points taken into account
 			for (int k = 0; k < CHANNELS; ++k) { centroid[k] /= (float) windowPoints; }
 
@@ -155,9 +144,12 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 			// update the mean
 			for (int k = 0; k < CHANNELS; ++k) { mean[k] = centroid[k]; }
 
+			private_continueIteration = false;
+
 			// set if the thread must continue, hence the block
 			if (shift >= epsilon) {
 				atomicOr((int *) &shared_continueIteration, true);
+				private_continueIteration = true;
 			}
 		}
 
