@@ -47,15 +47,12 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 	unsigned int phasesY = ceil((float) height / TILE_WIDTH);
 
     // stop value to check for the shift convergence
-    float epsilon = (float) pow(sqrt(const_squaredBandwidth) * EPSILON_MULTIPLIER, 2);
+    auto epsilon = (float) pow(sqrt(const_squaredBandwidth) * EPSILON_MULTIPLIER, 2);
 
-	float* mean;
-	auto* centroid = new float[CHANNELS];
+	float mean[CHANNELS];
 
     // check if the thread pixel is not outside the image
 	if (row < height && col < width) {
-		mean = &means[pos];
-
 		// initialize the mean on the current point
 		for (int k = 0; k < CHANNELS; ++k) { mean[k] = points[pos + k]; }
 	}
@@ -66,11 +63,13 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 	// shared_continueIteration is true if at least one thread per block must continue
 	while (shared_continueIteration)
 	{
-		// track the number of points inside the const_squaredBandwidth window
-		int windowPoints = 0;
+		float centroid[CHANNELS];
 
 		// initialize the centroid to 0 to accumulate points later
-		for (int k = 0; k < CHANNELS; ++k) { centroid[k] = 0; }
+		for (float& k : centroid) { k = 0; }
+
+		// track the number of points inside the const_squaredBandwidth window
+		int windowPoints = 0;
 
 		for (int phaseY = 0; phaseY < phasesY; ++phaseY)
 		{
@@ -110,7 +109,8 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 					{
 						for (int tileCol = 0; tileCol < tileDimX; ++tileCol)
 						{
-							float *point = &shared_tile[tileRow][tileCol * CHANNELS];
+							float point[CHANNELS];
+							for (int k = 0; k < CHANNELS; ++k) { point[k] = shared_tile[tileRow][tileCol * CHANNELS + k]; }
 
 							if (l2SquaredDistance_cuda(mean, point, CHANNELS) <= const_squaredBandwidth)
 							{
@@ -135,7 +135,7 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 		// check if the thread pixel is not outside the image
 		if (private_continueIteration && row < height && col < width) {
 			// get the centroid dividing by the number of points taken into account
-			for (int k = 0; k < CHANNELS; ++k) { centroid[k] /= (float) windowPoints; }
+			for (float& k : centroid) { k /= (float) windowPoints; }
 
 			float shift = l2SquaredDistance_cuda(mean, centroid, CHANNELS);
 
@@ -149,12 +149,12 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 				atomicOr((int *) &shared_continueIteration, true);
 				private_continueIteration = true;
 			}
+
+			for (int k = 0; k < CHANNELS; ++k) { means[pos + k] = mean[k]; }
 		}
 
 		__syncthreads();
 	}
-
-	delete[] centroid;
 }
 
 int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float *modes, int *clusters, int width, int height) {
