@@ -17,4 +17,5 @@ target_compile_options(Parallel_Mean_Shift_CUDA PRIVATE $<$<COMPILE_LANGUAGE:CUD
         #--generate-line-info
         --use_fast_math
         #--relocatable-device-code=true
+        #-Xptxas="-v"
         >)
