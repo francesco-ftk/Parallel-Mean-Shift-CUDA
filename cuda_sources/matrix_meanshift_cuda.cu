@@ -4,29 +4,13 @@
 #include "errors.cu"
 #include "distance.cu"
 
-
 #define CHANNELS 5
 #define EPSILON_MULTIPLIER 0.05f // this is different because bandwidth is squared
 #define THREADS_X 16
 #define THREADS_Y 16
 #define TILE_WIDTH 16
 
-// TODO kernel to weight the sums
-// TODO check with Excel sheet (shared memory)
-// TODO optimize to get coalesced access to memory
-// TODO update after HSV change ???
-/**
- * CUDA kernel to cluster an RGB image with the mean shift algorithm
- *
- * The mean shift algorithm is used in a 5-dimensional space (r, g, b, x, y) to cluster the pixels of an image.
- *
- * @param points the pixel values of the image
- * @param means the output array of means to compute
- * @param width the width of the image
- * @param height the height of the image
- *
- * @param bandwidth
- */
+// TODO: kernel to weight the sums
 
 __constant__ float const_squaredBandwidth;
 
@@ -78,11 +62,6 @@ __global__ void matrixMeanShiftCUDA_kernel(const float *points, float *means, in
 				// check tile dimension against image boarder
 				int tileDimX = min(TILE_WIDTH, width - TILE_WIDTH * phaseX);
 				int tileDimY = min(TILE_WIDTH, height - TILE_WIDTH * phaseY);
-
-				// FIXME use 2-batch loading (14_gpu_cuda_6 slide 6)
-				// TODO optimize (1 thread per channel)
-
-                // NEW
 
 				int loadingStepsX = std::ceil((float) TILE_WIDTH / THREADS_X);
 				int loadingStepsY = std::ceil((float) TILE_WIDTH / THREADS_Y);

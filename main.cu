@@ -1,73 +1,23 @@
 #include <iostream>
-#include <iostream>
 #include <chrono>
-#include "cuda_runtime.h"
 
 #include "cpp_sources/ppm_io.cpp"
-//#include "cpp_sources/matrix_meanshift.cpp"
-//#include "cpp_sources/soa_meanshift.cpp"
-#include "cpp_sources/rgb_pixels.cpp"
 #include "cuda_sources/color_converter.cu"
 
 #include "cuda_sources/matrix_meanshift_cuda.cu"
 
-#define INPUT_PATH "../img/balloons_100.ppm"
+#define INPUT_PATH "../img/balloons_250.ppm"
 #define OUTPUT_PATH "../img/out.ppm"
-#define ITERATIONS 1
+#define ITERATIONS 10
 #define BANDWIDTH 0.4
 #define COLOR_SPACE_DIMENSION 3
 #define CLUSTERING_SPACE_DIMENSION 5
 #define RGB_MAX_VALUE 255
 #define HUE_MAX_VALUE 360
 
-/* ----- TIMINGS ------------------------------
- * 100x100 image, Windows, 12 cores, 18 threads, block 16x16, tile 16x16
- * 	 Matrix sequential: 3609ms	(release)
- * 	 Matrix sequential: ???		(debug)
- * 	 Matrix OpenMP:		1029ms	(release)
- * 	 Matrix OpenMP:		???		(debug)
- *   SoA sequential:	3834ms	(release)
- *   SoA sequential:	???		(debug)
- * 	 SoA OpenMP:		1060ms	(release)
- * 	 SoA OpenMP:		???		(debug)
- * 	 Matrix Cuda:		1973ms	(release)
- * 	 Matrix Cuda:		2012ms	(debug)
- *
- *	 Speedup OpenMP Matrix:		3.5 (release)
- * 	 Speedup OpenMP Matrix:		3.5 (debug)
- * 	 Speedup OpenMP SoA: 		3.6 (release)
- * 	 Speedup OpenMP SoA: 		3.6 (debug)
- * 	 Speedup Matrix Cuda: 		??? (release)
- * 	 Speedup Matrix Cuda: 		??? (debug)
- *
- * 100x100 image, Linux, 8 cores, 12 threads, block 16x16, tile 16x16
- *
- * 	 Matrix sequential: 2461ms	(release)
- * 	 Matrix sequential: 40924ms	(debug)
- * 	 Matrix OpenMP:		998ms	(release)
- * 	 Matrix OpenMP:		12436ms		(debug)
- *   SoA sequential:	2711ms	(release)
- *   SoA sequential:	40007ms		(debug)
- * 	 SoA OpenMP:		726ms	(release)
- * 	 SoA OpenMP:		13838ms		(debug)
- * 	 Matrix Cuda:		6945ms  (release)
- * 	 Matrix Cuda:		13000ms		(debug)
- *
- *	 Speedup OpenMP Matrix:		2.5 (release)
- * 	 Speedup OpenMP Matrix:		3.2 (debug)
- * 	 Speedup OpenMP SoA: 		3.7 (release)
- * 	 Speedup OpenMP SoA: 		2.9 (debug)
- * 	 Speedup Matrix Cuda: 		??? (release)
- * 	 Speedup Matrix Cuda: 		5.4 (debug)
- *
- * Averaged on 10 iterations
- * --------------------------------------------
- */
+using namespace std::chrono;
 
-// todo: cluster in the HSV space
-// todo: cluster in the L*U*V* space
-// todo: kernel multiplication
-// todo: parallelize using Cuda
+// TODO: kernel multiplication
 
 int main()
 {
@@ -75,7 +25,7 @@ int main()
 	PPM ppm;
 	if (ppm.read(INPUT_PATH) != 0)
 	{
-		cout << "ERROR: failed to open the image";
+		std::cout << "ERROR: failed to open the image";
 		return -1;
 	}
 	int width = ppm.getW();
@@ -94,12 +44,6 @@ int main()
 		int G = inputBuffer[i * COLOR_SPACE_DIMENSION + 1];
 		int B = inputBuffer[i * COLOR_SPACE_DIMENSION + 2];
 
-		/*double X,Y,Z;
-		RGBtoXYZ(R, G, B, X, Y, Z);
-		Xmax = std::max(X, Xmax);
-		Ymax = std::max(Y, Ymax);
-		Zmax = std::max(Z, Zmax);*/
-
 		float fR = (float) R / RGB_MAX_VALUE;
 		float fG = (float) G / RGB_MAX_VALUE;
 		float fB = (float) B / RGB_MAX_VALUE;
@@ -114,22 +58,7 @@ int main()
 		pixels[i * CLUSTERING_SPACE_DIMENSION + 3] = fX;
 		pixels[i * CLUSTERING_SPACE_DIMENSION + 4] = fY;
 
-		/*if ((i + 500) % 1000 == 0) {
-			printf("------------------------------\n");
-			printf("R:\t%d\tG:\t%d\tB:\t%d\n", R, G, B);
-			printf("X:\t%f\tY:\t%f\tZ:\t%f\n", X, Y, Z);
-			//printf("fR:\t%f\tfG:\t%f\tfB:\t%f\n", fR, fG, fB);
-			//printf("fH:\t%f\tfS:\t%f\tfV:\t%f\n", fH, fS, fV);
-			printf("fX:\t%f\tfY:\t%f\n", fX, fY);
-			printf("------------------------------\n");
-		}*/
 	}
-
- /*
-    printf("Xmax:\t%f\n", Xmax);
-	printf("Ymax:\t%f\n", Ymax);
-	printf("Zmax:\t%f\n", Zmax);
- */
 
 	// create the index array
 	int* clusters = new int[nOfPixels];
@@ -144,11 +73,11 @@ int main()
 		printf("Calling the MeanShift function... (%d)\n", i);
 
 		// time the function
-		auto start_time = chrono::high_resolution_clock::now();
+		auto start_time = high_resolution_clock::now();
 		nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, CLUSTERING_SPACE_DIMENSION, modes, clusters, width, height);
-		auto end_time = chrono::high_resolution_clock::now();
+		auto end_time = high_resolution_clock::now();
 
-		totalTime += chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() / 1000.f;
+		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
 	}
 
 	float averageTime = totalTime / ITERATIONS;
@@ -169,11 +98,7 @@ int main()
         float fR = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION];
 		float fG = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 1];
 		float fB = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 2];
-		//float fX = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 3];
-		//float fY = modes[clusters[i] * CLUSTERING_SPACE_DIMENSION + 4];
 
-		/*double R, G, B;
-		XYZtoRGB(X, Y, Z, R, G, B);*/
 
 		int R = (int) (fR * RGB_MAX_VALUE);
 		int G = (int) (fG * RGB_MAX_VALUE);
@@ -183,24 +108,14 @@ int main()
 		outputBuffer[i * COLOR_SPACE_DIMENSION + 1] = G;
 		outputBuffer[i * COLOR_SPACE_DIMENSION + 2] = B;
 
-		/*if ((i + 500) % 1000 == 0) {
-			printf("------------------------------\n");
-			printf("R:\t%d\tG:\t%d\tB:\t%d\n", R, G, B);
-			printf("fR:\t%f\tfG:\t%f\tfB:\t%f\n", fR, fG, fB);
-			printf("fH:\t%f\tfS:\t%f\tfV:\t%f\n", fH, fS, fV);
-			printf("fX:\t%f\tfY:\t%f\n", fX, fY);
-			printf("------------------------------\n");
-		}*/
 	}
-
-    // printf("R: %f, G: %f, B: %f, H, %f, S: %f, V: %f \n", fR, fG, fB, fH, fS, fV);
 
 	ppm.load(outputBuffer, height, width, ppm.getMax(), ppm.getMagic());
 
 	// write the output ppm image
 	if (ppm.write(OUTPUT_PATH) != 0)
 	{
-		cout << "ERROR: failed to write the image";
+		std::cout << "ERROR: failed to write the image";
 		return -1;
 	}
 
