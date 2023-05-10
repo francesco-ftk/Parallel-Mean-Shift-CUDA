@@ -230,10 +230,10 @@ int matrixMeanShiftCUDA(float *points, float bandwidth, size_t dimension, float 
     float totalTime_sequential = (float) std::chrono::duration_cast<std::chrono::microseconds>(end_time_sequential - start_time_sequential).count() / 1000.f;
     float totalTime = totalTime_cuda + totalTime_sequential;
 
-    printf("Cuda timings:");
+    /*printf("Cuda timings:");
     printf("  cuda:   %fms\n", totalTime_cuda);
     printf("  sequential: %fms\n", totalTime_sequential);
-    printf("  total: %fms\n", totalTime);
+    printf("  total: %fms\n", totalTime);*/
 
     return clustersCount;
 }

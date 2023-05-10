@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 project(Parallel_Mean_Shift_CUDA LANGUAGES CXX CUDA)
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
 
 add_subdirectory(cpp_sources)
 add_subdirectory(cuda_sources)

@@ -1,14 +1,16 @@
 #include <iostream>
 #include <chrono>
+#include <filesystem>
 
 #include "cpp_sources/ppm_io.cpp"
 #include "cuda_sources/color_converter.cu"
 
 #include "cuda_sources/matrix_meanshift_cuda.cu"
 
-#define INPUT_PATH "../img/balloons_250.ppm"
+#define INPUT_FOLDER "../img/input/"
+#define INPUT_PATH "../img/balloons_50.ppm"
 #define OUTPUT_PATH "../img/out.ppm"
-#define ITERATIONS 10
+#define ITERATIONS 1
 #define BANDWIDTH 0.4
 #define COLOR_SPACE_DIMENSION 3
 #define CLUSTERING_SPACE_DIMENSION 5
@@ -16,14 +18,13 @@
 #define HUE_MAX_VALUE 360
 
 using namespace std::chrono;
+namespace fs = std::filesystem;
 
-// TODO: kernel multiplication
 
-int main()
-{
+int imageIteration(std::string inputPath) {
 	// open the ppm image
 	PPM ppm;
-	if (ppm.read(INPUT_PATH) != 0)
+	if (ppm.read(inputPath) != 0)
 	{
 		std::cout << "ERROR: failed to open the image";
 		return -1;
@@ -70,7 +71,7 @@ int main()
 	// function loop
 	for (int i = 0; i < ITERATIONS; ++i)
 	{
-		printf("Calling the MeanShift function... (%d)\n", i);
+		//printf("Calling the MeanShift function... (%d)\n", i);
 
 		// time the function
 		auto start_time = high_resolution_clock::now();
@@ -83,9 +84,10 @@ int main()
 	float averageTime = totalTime / ITERATIONS;
 
 	// print the results
-	printf("Matrix timings: (measured on %d iterations)\n", ITERATIONS);
+	//printf("Matrix timings: (measured on %d iterations)\n", ITERATIONS);
+	printf("CUDA timing (%s)\n", inputPath.c_str());
 	printf("  total:   %fms\n", totalTime);
-	printf("  average: %fms\n", averageTime);
+	//printf("  average: %fms\n", averageTime);
 	printf("Number of clusters: %d\n", nOfClusters);
 
 	printf("\n");
@@ -124,6 +126,13 @@ int main()
 	delete[] clusters;
 	delete[] outputBuffer;
 
+	return 0;
+}
+
+int main() {
+	for (const auto & b_entry : fs::directory_iterator(INPUT_FOLDER)) {
+		imageIteration(b_entry.path().string());
+	}
 	return 0;
 }
 
