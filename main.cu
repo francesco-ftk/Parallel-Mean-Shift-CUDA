@@ -2,6 +2,7 @@
 #include <chrono>
 #include <filesystem>
 
+#include "cpp_sources/matrix_meanshift.cpp"
 #include "cpp_sources/ppm_io.cpp"
 #include "cuda_sources/color_converter.cu"
 
@@ -75,7 +76,8 @@ int imageIteration(std::string inputPath) {
 
 		// time the function
 		auto start_time = high_resolution_clock::now();
-		nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, CLUSTERING_SPACE_DIMENSION, modes, clusters, width, height);
+		//nOfClusters = matrixMeanShiftCUDA(pixels, BANDWIDTH, CLUSTERING_SPACE_DIMENSION, modes, clusters, width, height);
+		nOfClusters = matrixMeanShift(pixels, nOfPixels, BANDWIDTH, modes, clusters);
 		auto end_time = high_resolution_clock::now();
 
 		totalTime += duration_cast<microseconds>(end_time - start_time).count() / 1000.f;
@@ -85,10 +87,10 @@ int imageIteration(std::string inputPath) {
 
 	// print the results
 	//printf("Matrix timings: (measured on %d iterations)\n", ITERATIONS);
-	printf("CUDA timing (%s)\n", inputPath.c_str());
-	printf("  total:   %fms\n", totalTime);
+	printf("Image:     %s\n", inputPath.c_str());
+	printf("Time:      %fms\n", totalTime);
 	//printf("  average: %fms\n", averageTime);
-	printf("Number of clusters: %d\n", nOfClusters);
+	printf("Clusters:  %d\n", nOfClusters);
 
 	printf("\n");
 

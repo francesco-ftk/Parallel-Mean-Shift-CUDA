@@ -6,9 +6,9 @@
 
 #define CHANNELS 5
 #define EPSILON_MULTIPLIER 0.05f // this is different because bandwidth is squared
-#define THREADS_X 16
-#define THREADS_Y 16
 #define TILE_WIDTH 16
+#define THREADS_X TILE_WIDTH
+#define THREADS_Y TILE_WIDTH
 
 // TODO: kernel to weight the sums
 
